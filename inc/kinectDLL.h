@@ -19,3 +19,4 @@ int stop(kinectSubject* kinectTarget);
 Observer* getObserver(kinectSubject* kinectTarget);
 int removeObserver(Observer* observeTarget);
 float* getJoint(Observer* observeTarget);
+cv::Mat* getMat(Observer* observeTarget);

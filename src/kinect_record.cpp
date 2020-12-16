@@ -44,6 +44,7 @@ int kinectSubject::init()
 	}
 	//初始化为NULL但是会造成程序在k4a_record_close时报错，于是在后续的if中解决了此问题
 	dev_ = new k4a_device_t[uintNum_];
+	mtx_ = new mutex[uintNum_];
 	k4a_device_configuration_t* config = new k4a_device_configuration_t[uintNum_];
 	sensorCalibration_ = new k4a_calibration_t[uintNum_];
 
@@ -151,6 +152,7 @@ void kinectSubject::cap(k4a_device_t& dev, const int i, const k4a_calibration_t&
 	VERIFY(k4abt_tracker_create(&sensorCalibration, tracker_config, &tracker), "Body tracker initialization failed!");
 	while (1)
 	{
+		cout << "??99" << endl;
 		if (k4a_device_get_capture(dev, &element.sensor_capture, K4A_WAIT_INFINITE) == K4A_WAIT_RESULT_SUCCEEDED)
 		{
 			colorImage = k4a_capture_get_color_image(element.sensor_capture);//从捕获中获取图像
@@ -168,6 +170,7 @@ void kinectSubject::cap(k4a_device_t& dev, const int i, const k4a_calibration_t&
 				cout << "colorframe imdecode erro" << endl;
 			}
 			onePicture(tracker, &element, iterator);
+			
 			//imshow("Kinect color frame" + std::to_string(i), colorFrame);
 			//waitKey(1);//窗口的要等待时间，当显示图片时，窗口不用实时更新，所以imshow之前不加waitKey也是可以的，但若显示实时的视频，就必须加waitKey
 			k4a_capture_release(element.sensor_capture);
