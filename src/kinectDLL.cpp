@@ -36,5 +36,7 @@ float* getJoint(Observer* observeTarget) {
 	return observeTarget->getJoint();
 }
 
-
+cv::Mat* getMat(Observer* observeTarget) {
+	return observeTarget->getMat();
+}
 

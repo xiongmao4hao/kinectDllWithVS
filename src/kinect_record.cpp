@@ -129,16 +129,15 @@ void kinectSubject::cap(k4a_device_t& dev, const int i, const k4a_calibration_t&
 {
 	k4a_image_t colorImage;
 	uint8_t* colorTextureBuffer;
-	k4a_capture_t sensor_capture;//捕获用变量
-	cv::Mat colorFrame;
 	oneElement element;
 
 	//注意要在外部调用库时依据kinect数目创建
 	std::list<IObserver*>::iterator iterator = list_observer_.begin();
 	if (uintNum_ != list_observer_.size())
 	{
-		printf("no enough observe or kinect\n");
+		printf("no matching observe：\n");
 		HowManyObserver();
+		cout << "while " << i << "kinect" << endl;
 		exit(1);
 	}
 	else {
@@ -150,31 +149,31 @@ void kinectSubject::cap(k4a_device_t& dev, const int i, const k4a_calibration_t&
 	k4abt_tracker_t tracker = NULL;
 	k4abt_tracker_configuration_t tracker_config = K4ABT_TRACKER_CONFIG_DEFAULT;
 	VERIFY(k4abt_tracker_create(&sensorCalibration, tracker_config, &tracker), "Body tracker initialization failed!");
-	//amedWindow("Kinect color frame" + std::to_string(i));
 	while (1)
 	{
-		if (k4a_device_get_capture(dev, &sensor_capture, K4A_WAIT_INFINITE) == K4A_WAIT_RESULT_SUCCEEDED)
+		if (k4a_device_get_capture(dev, &element.sensor_capture, K4A_WAIT_INFINITE) == K4A_WAIT_RESULT_SUCCEEDED)
 		{
-			colorImage = k4a_capture_get_color_image(sensor_capture);//从捕获中获取图像
-			onePicture(sensor_capture, tracker, &element, iterator);
+			colorImage = k4a_capture_get_color_image(element.sensor_capture);//从捕获中获取图像
 			colorTextureBuffer = k4a_image_get_buffer(colorImage);
 
 			//depthFrame = cv::Mat(depthImage.get_height_pixels(), depthImage.get_width_pixels(), CV_8UC4, depthTextureBuffer.data());
-			colorFrame = cv::Mat(1, k4a_image_get_height_pixels(colorImage) * k4a_image_get_width_pixels(colorImage), CV_8UC1, colorTextureBuffer);
-			colorFrame = imdecode(colorFrame, IMREAD_COLOR);
+			std::unique_lock<std::mutex> locker(mtx_[i]);
+			element.colorFrame = cv::Mat(1, k4a_image_get_height_pixels(colorImage) * k4a_image_get_width_pixels(colorImage), CV_8UC1, colorTextureBuffer);
+			element.colorFrame = imdecode(element.colorFrame, IMREAD_COLOR);
 			k4a_image_release(colorImage);
-			cvtColor(colorFrame, colorFrame, COLOR_BGRA2BGR);
-
-			if (colorFrame.data == NULL)
+			cvtColor(element.colorFrame, element.colorFrame, COLOR_BGRA2BGR);
+			locker.unlock();
+			if (element.colorFrame.data == NULL)
 			{
 				cout << "colorframe imdecode erro" << endl;
 			}
+			onePicture(tracker, &element, iterator);
 			//imshow("Kinect color frame" + std::to_string(i), colorFrame);
 			//waitKey(1);//窗口的要等待时间，当显示图片时，窗口不用实时更新，所以imshow之前不加waitKey也是可以的，但若显示实时的视频，就必须加waitKey
-			k4a_capture_release(sensor_capture);
+			k4a_capture_release(element.sensor_capture);
 		}
-		else if (k4a_device_get_capture(dev, &sensor_capture, K4A_WAIT_INFINITE) == K4A_WAIT_RESULT_FAILED)
-			VERIFY(k4a_device_get_capture(dev, &sensor_capture, 10), "Capture failed");
+		else if (k4a_device_get_capture(dev, &element.sensor_capture, K4A_WAIT_INFINITE) == K4A_WAIT_RESULT_FAILED)
+			VERIFY(k4a_device_get_capture(dev, &element.sensor_capture, 10), "Capture failed");
 		if (bDel_)
 		{
 			k4a_device_stop_cameras(dev);//停止流
@@ -197,28 +196,30 @@ int kinectSubject::capThread()
 	return 0;
 }
 
-int kinectSubject::onePicture(const k4a_capture_t& sensor_capture, k4abt_tracker_t& tracker, \
+int kinectSubject::onePicture(k4abt_tracker_t& tracker, \
 	oneElement* const element, std::list<IObserver*>::iterator iterator)
 {
-	//捕获并写入人体骨架
+	//?????????
 	k4a_wait_result_t queue_capture_result = \
-		k4abt_tracker_enqueue_capture(tracker, sensor_capture, K4A_WAIT_INFINITE);//异步提取骨骼信息
+		k4abt_tracker_enqueue_capture(tracker, element->sensor_capture, K4A_WAIT_INFINITE);//????????
 	if (queue_capture_result == K4A_WAIT_RESULT_TIMEOUT)
 	{
 		// It should never hit timeout when K4A_WAIT_INFINITE is set.
 		cout << "Error! Add capture to tracker process queue timeout!\n" << endl;
+		(*iterator)->OnlyShowMat(element->colorFrame);
 	}
 	else if (queue_capture_result == K4A_WAIT_RESULT_FAILED)
 	{
 		cout << "Error! Add capture to tracker process queue failed!\n" << endl;
+		(*iterator)->OnlyShowMat(element->colorFrame);
 	}
 	else
 	{
 		
 		k4a_wait_result_t pop_frame_result = \
 			k4abt_tracker_pop_result(tracker, &element->body_frame, K4A_WAIT_INFINITE);
-		element->timeStamp = k4abt_frame_get_device_timestamp_usec(element->body_frame);//获取时间戳
-		// 骨骼点数据清除和计算人数
+		element->timeStamp = k4abt_frame_get_device_timestamp_usec(element->body_frame);//?????
+		// ????????????
 		uint32_t numBodies = k4abt_frame_get_num_bodies(element->body_frame);
 		if (pop_frame_result == K4A_WAIT_RESULT_SUCCEEDED)
 		{
@@ -230,15 +231,14 @@ int kinectSubject::onePicture(const k4a_capture_t& sensor_capture, k4abt_tracker
 			if (get_body_skeleton == K4A_RESULT_SUCCEEDED)
 			{
 				cout << "have joints\n" << endl;
-				/***************求角度*******************/
-				JointsPositionToAngel(element->skeleton, &element->joints_Angel);//必须传入地址&，joints_Angel虽然值相同但是数据类型有问题
-				(*iterator)->Update(*element);
+				/***************???*******************/
+				JointsPositionToAngel(element->skeleton, &element->joints_Angel);//??????&,joints_Angel??????????????
 			}
 			else if (get_body_skeleton == K4A_RESULT_FAILED)
 			{
 				cout << "Get body skeleton failed!!\n" << endl;
 			}
-			//获取kinect的人体ID
+			//??kinect???ID
 			/*uint32_t id = k4abt_frame_get_body_id(element->body_frame, 1);*/
 			k4abt_frame_release(element->body_frame);
 		}
@@ -253,6 +253,7 @@ int kinectSubject::onePicture(const k4a_capture_t& sensor_capture, k4abt_tracker
 			cout << "Pop body frame result failed!\n" << endl;
 			return 1;
 		}
+		(*iterator)->Update(element);
 	}
 	return 0;
 }
