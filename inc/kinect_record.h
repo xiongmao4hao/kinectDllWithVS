@@ -8,17 +8,6 @@
 #define JOINT_NUM 32
 #endif // !JOINT_NUM
 
-//为了c++调用
-#ifdef AFX_EX_CLASS
-
-#define AFX_EX_CLASS _declspec(dllexport)
-
-#else
-
-#define AFX_EX_CLASS _declspec(dllimport)
-
-#endif
-
 //#define LOGFILE "D:\\logForKinect.txt"
 
 #define KEY_DOWN(VK_NONAME) ((GetAsyncKeyState(VK_NONAME) & 0x8001) ? 1:0)//自对GetAsyncKeyState函数的上一次调用以来，如键已被按过，则位0设为1；否则设为0。如键目前处于按下状态，则位15设为1；如抬起，则为0。详见有道云
@@ -105,7 +94,7 @@ public:
 //kinect主题
 class  kinectSubject : public ISubject {
 public:
-	uint32_t uintNum_, iMasterNum_;
+	uint32_t uintNum_, iMasterNum_ = 1;
 	std::mutex* mtx_;
 
 	kinectSubject();
@@ -202,7 +191,6 @@ private:
 
 	}
 };
-
 
 
 

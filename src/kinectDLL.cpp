@@ -7,36 +7,57 @@ using namespace std;
 
 int Observer::static_number_ = 0;
 
-kinectSubject* getKinectSubject() {
-	return new kinectSubject();
+kinectSubject* kinect = nullptr;
+std::list<IObserver*> list_observer;
+
+Observer* getIteratorin(int i){
+	list<IObserver*>::iterator iterator = list_observer.begin();
+	for (int j = i; j > 0; --j) {
+			++iterator;
+		}
+	return (Observer*)(*iterator);
 }
 
-int start(kinectSubject* kinectTarget) {
-	return kinectTarget->recordStart();
+void* getKinectSubject() {
+	delete kinect;
+	kinect = new kinectSubject();
+	return kinect;
 }
 
-int cap(kinectSubject* kinectTarget) {
-	return kinectTarget->capThread();
+int start() {
+	return kinect->recordStart();
 }
 
-int stop(kinectSubject* kinectTarget) {
-	return kinectTarget->recordStop();
+int cap() {
+	return kinect->capThread();
 }
 
-Observer* getObserver(kinectSubject* kinectTarget) {
-	return new Observer(*kinectTarget);
+int stop() {
+	return kinect->recordStop();
 }
 
-int removeObserver(Observer* observeTarget) {
+uint getObserver() {
+	list_observer.push_back(new Observer(*kinect));
+	return list_observer.size();
+}
+
+int removeObserver(int i){
+	Observer* observeTarget = getIteratorin(i);
 	observeTarget->RemoveMeFromTheList();
 	return 0;
 }
  
-float* getJoint(Observer* observeTarget) {
+float* getJoint(int i) {
+	Observer* observeTarget = getIteratorin(i);
 	return observeTarget->getJoint();
 }
 
-cv::Mat* getMat(Observer* observeTarget) {
+cv::Mat* getMat(int i) {
+	Observer* observeTarget = getIteratorin(i);
 	return observeTarget->getMat();
 }
 
+bool getMatFlag(int i){
+	Observer* observeTarget = getIteratorin(i);
+	return observeTarget->matFlag;
+}

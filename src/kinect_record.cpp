@@ -5,7 +5,6 @@ using namespace cv;
 using namespace std;
 
 
-
 kinectSubject::kinectSubject() {
     std::cout << "hi, I was the kinectSubject.\n";
 	reKinct();
