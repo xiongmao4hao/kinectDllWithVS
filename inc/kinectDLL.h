@@ -19,6 +19,8 @@
 #ifdef __cplusplus
 extern "C"
 {
+#endif
+
     EXPORT_API void* getKinectSubject();
     EXPORT_API uint32_t getuintNum();
     EXPORT_API int start();
@@ -29,6 +31,11 @@ extern "C"
     EXPORT_API float* getJoint(int i);
     EXPORT_API cv::Mat* getMat(int i);
     EXPORT_API bool getMatFlag(int i);
+
+#ifdef __cplusplus
 }
 #endif
+
+const char*[] write_fifo = "/tmp/write_fifo";
+const char*[] read_fifo = "/tmp/read_fifo";
 
