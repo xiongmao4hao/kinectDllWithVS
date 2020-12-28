@@ -24,6 +24,10 @@ void* getKinectSubject() {
 	return kinect;
 }
 
+uint32_t getuintNum(){
+	return kinect->uintNum_;
+}
+
 int start() {
 	return kinect->recordStart();
 }
@@ -43,6 +47,7 @@ uint getObserver() {
 
 int removeObserver(int i){
 	Observer* observeTarget = getIteratorin(i);
+	list_observer.remove(observeTarget);//未验证的remove函数
 	observeTarget->RemoveMeFromTheList();
 	return 0;
 }

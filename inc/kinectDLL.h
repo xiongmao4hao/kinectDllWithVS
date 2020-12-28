@@ -20,6 +20,7 @@
 extern "C"
 {
     EXPORT_API void* getKinectSubject();
+    EXPORT_API uint32_t getuintNum();
     EXPORT_API int start();
     EXPORT_API int cap();
     EXPORT_API int stop();
