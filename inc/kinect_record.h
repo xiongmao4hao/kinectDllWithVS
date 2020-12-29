@@ -66,6 +66,17 @@
 
 #include <math.h>
 #include <string>
+
+//为了建立pipe使用的c的库
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 	
 using namespace std;
 
@@ -218,10 +229,15 @@ public:
 			
 			write(write_fd, sendbuff, strlen(sendbuff)+1);
 		}
-		unlink(write_fifo);
+		unlink(write_fifo_);
 	
 	return 0;
 	}
+
+	static uint32_t getStatic_number_(){
+		return static_number_;
+	}
+
 private:
 	//std::string message_from_subject_;
 	//std::mutex mtx;

@@ -41,9 +41,9 @@ int stop() {
 }
 
 uint getObserver() {
-	string tmpStringW = write_fifo + Observer.static_number_;
+	string tmpStringW = write_fifo + to_string(Observer::getStatic_number_());
 	const char* tmpCharW = tmpStringW.c_str();
-	string tmpStringR = read_fifo + Observer.static_number_;
+	string tmpStringR = read_fifo + to_string(Observer::getStatic_number_());
 	const char* tmpCharR = tmpStringR.c_str();
 	list_observer.push_back(new Observer(*kinect,tmpCharW,tmpCharR));
 	return list_observer.size();
