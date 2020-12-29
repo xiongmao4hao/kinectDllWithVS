@@ -5,7 +5,7 @@
 using namespace cv;
 using namespace std;
 
-int Observer::static_number_ = 0;
+uint32_t Observer::static_number_ = 0;
 
 kinectSubject* kinect = nullptr;
 std::list<IObserver*> list_observer;
@@ -41,7 +41,11 @@ int stop() {
 }
 
 uint getObserver() {
-	list_observer.push_back(new Observer(*kinect));
+	string tmpStringW = write_fifo + Observer.static_number_;
+	const char* tmpCharW = tmpStringW.c_str();
+	string tmpStringR = read_fifo + Observer.static_number_;
+	const char* tmpCharR = tmpStringR.c_str();
+	list_observer.push_back(new Observer(*kinect,tmpCharW,tmpCharR));
 	return list_observer.size();
 }
 

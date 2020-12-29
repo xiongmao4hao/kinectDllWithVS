@@ -16,6 +16,9 @@
 
 #include "kinect_record.h"
 
+const std::string write_fifo = "/tmp/write_fifo";
+const std::string read_fifo = "/tmp/read_fifo";
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -36,6 +39,5 @@ extern "C"
 }
 #endif
 
-const char*[] write_fifo = "/tmp/write_fifo";
-const char*[] read_fifo = "/tmp/read_fifo";
+
 

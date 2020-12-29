@@ -29,7 +29,16 @@
     {                                                                                                    \
         printf("%s \n - (File: %s, Function: %s, Line: %d)\n", error, __FILE__, __FUNCTION__, __LINE__); \
         exit(1);                                                                                         \
-    }   
+    } 
+
+#define MAXLINE 512
+
+#define ERR_EXIT(sz) \
+        do{ \
+            perror(sz); \
+            exit(EXIT_FAILURE); \
+        }while(0)
+   
 
 //#define PRINTFORLOG(logFile, log)\
 //	printf("%s",log);\
@@ -56,6 +65,7 @@
 #include <time.h>
 
 #include <math.h>
+#include <string>
 	
 using namespace std;
 
@@ -134,7 +144,8 @@ private:
 class  Observer : public IObserver {
 public:
 	volatile bool matFlag = false;
-	Observer(ISubject& subject) : subject_(subject) {
+	Observer(ISubject& subject,const char* write_fifo,const char* read_fifo) : \
+	subject_(subject),write_fifo_(write_fifo),read_fifo_(read_fifo) {
 		this->subject_.Attach(this);
 		cout << "Hi, I'm the Observer \"" << ++Observer::static_number_ << "\".\n";
 		this->number_ = Observer::static_number_;
@@ -170,12 +181,55 @@ public:
 		//std::unique_lock<std::mutex> locker(mtx);
 		return &element_->colorFrame;
 	}
+
+	virtual int pipeConnect(){
+		int res;
+		if(access(read_fifo_, F_OK) < 0){     //检测是否存在
+			if( (res = mkfifo(write_fifo_, O_CREAT|O_EXCL|0755)) < 0)   //创建写fifo，0755为执行权限
+				ERR_EXIT("mkfifo err.");
+		}
+		
+		int write_fd;
+		if( (write_fd = open(write_fifo_, O_WRONLY)) < 0){
+			unlink(write_fifo_);            //如果失败，删除
+			ERR_EXIT("open write_fifo err.");
+		}
+		
+		printf("waiting\n");
+
+		int read_fd;
+		while( (read_fd = open(read_fifo_, O_RDONLY)) < 0)   //等待客户端创建读fifo
+			sleep(1);
+		printf("client connect.\n");
+	
+		char sendbuff[MAXLINE];
+		char recvbuff[MAXLINE];
+		
+		for(; ;){
+			//printf("client:>");
+			ssize_t ret;
+			//检测接收端是否正常
+			if( (ret = read(read_fd, recvbuff, MAXLINE)) < 0)
+				ERR_EXIT("read err.");
+			printf("%s\n", recvbuff);
+			
+			// printf("server:>");
+			// scanf("%s", sendbuff);
+			
+			write(write_fd, sendbuff, strlen(sendbuff)+1);
+		}
+		unlink(write_fifo);
+	
+	return 0;
+	}
 private:
 	//std::string message_from_subject_;
 	//std::mutex mtx;
 	oneElement* element_;
 	ISubject& subject_;
-	static int static_number_;
+	const char* write_fifo_;
+	const char* read_fifo_;
+	static uint32_t static_number_;
 	int number_;
 	float fJoint_[JOINT_NUM * 3 + 1];
 
