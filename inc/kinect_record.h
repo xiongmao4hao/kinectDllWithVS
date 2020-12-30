@@ -189,7 +189,6 @@ public:
 		while (!matFlag){
 			cout << "please wait" << endl;
 		}
-		//std::unique_lock<std::mutex> locker(mtx);
 		return &element_->colorFrame;
 	}
 
