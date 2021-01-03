@@ -195,6 +195,7 @@ public:
 	virtual int pipeConnect(){
 		int res;
 		if(access(read_fifo_, F_OK) < 0){     //检测是否存在
+			remove(write_fifo_);
 			if( (res = mkfifo(write_fifo_, O_CREAT|O_EXCL|0755)) < 0)   //创建写fifo，0755为执行权限
 				ERR_EXIT("mkfifo err.");
 		}
