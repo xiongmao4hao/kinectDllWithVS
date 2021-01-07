@@ -6,6 +6,7 @@ using namespace cv;
 using namespace std;
 
 int Observer::static_number_ = 0;
+uint PipeElements::static_number_ = 0;
 
 kinectSubject* kinect = nullptr;
 std::list<IObserver*> list_observer;

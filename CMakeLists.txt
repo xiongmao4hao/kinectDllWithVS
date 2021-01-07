@@ -40,5 +40,6 @@ if ("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_C_COMPILER_ID}" STREQUAL
 endif()
 
 FIND_PACKAGE(OpenCV REQUIRED)
+FIND_PACKAGE(nlohmann_json 3.2.0 REQUIRED)
 
 add_subdirectory(src)

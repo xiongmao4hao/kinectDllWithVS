@@ -9,6 +9,11 @@
 #endif // !JOINT_NUM
 
 //#define LOGFILE "D:\\logForKinect.txt"
+#define ERR_EXIT(sz) \
+        do{ \
+            perror(sz); \
+            exit(EXIT_FAILURE); \
+        }while(0)
 
 #define KEY_DOWN(VK_NONAME) ((GetAsyncKeyState(VK_NONAME) & 0x8001) ? 1:0)//自对GetAsyncKeyState函数的上一次调用以来，如键已被按过，则位0设为1；否则设为0。如键目前处于按下状态，则位15设为1；如抬起，则为0。详见有道云
 
@@ -56,8 +61,23 @@
 #include <time.h>
 
 #include <math.h>
-	
+
+#include <nlohmann/json.hpp>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <string>
+
+using json = nlohmann::json;
+using namespace cv;
 using namespace std;
+
 
 //数据保存用结构体
 struct oneElement {
@@ -190,6 +210,59 @@ private:
 		}
 
 	}
+};
+
+class PipeElements{
+public:
+	//构造函数保证了写通道的建立
+	PipeElements(const string& writeFifo, const string& readFifo, const uint& index = 0):\
+	index_(index),\
+	writeFifo_(writeFifo + to_string(index)),\
+	readFifo_(readFifo + to_string(index)){	
+		if(access(readFifo_.c_str(), F_OK) < 0) cout << "A readFifo_" << index_ << "exist" << endl;
+		if( (writeFd_ = open(writeFifo_.c_str(), O_WRONLY)) < 0){
+			unlink(writeFifo_.c_str());            //如果失败，删除
+			ERR_EXIT("open write_fifo err.");
+		}
+		cout << "Hi, I'm the PipeElements \"" << ++PipeElements::static_number_ << "\".\n";
+	}
+
+	~PipeElements(){
+		cout << "Goodbye, I was the pipeELement \"" << this->index_ << "\".\n";
+		unlink(writeFifo_.c_str()); 
+	}
+
+	int getAPicture(const Mat& picture, const string& format);
+
+	int getString(const string& element, const string& elementName) {
+		j_[elementName] = stringToBase64_(element);
+		return 0;
+	}
+
+	int sendJson();
+
+	int findObserve(const bool& tmpFlag){
+		while(open(readFifo_.c_str(), O_RDONLY) <0){
+			sleep(1);
+			cout << "waiting observe" << endl;//原理上是在保证readFifo_为observe建立
+			if(tmpFlag)
+			{
+				break;
+			}
+		}
+		return 0;
+	}
+
+private:
+	const string writeFifo_;
+	const string readFifo_;
+	int writeFd_;
+	const uint index_;
+	static uint static_number_;
+	json j_;
+	string stringToBase64_(const string& element);
+	string charToBase64_(const vector<uchar>& element);
+
 };
 
 

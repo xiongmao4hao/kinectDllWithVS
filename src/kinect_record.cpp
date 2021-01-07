@@ -1,9 +1,34 @@
 #include "kinect_record.h"
 #include "kinectDLL.h"
+#include "base64.h"
 
 using namespace cv;
 using namespace std;
+using json = nlohmann::json;
 
+int PipeElements::getAPicture(const Mat& picture, const string& format){
+		std::vector<unsigned char> picture_encode; 
+		int res2 = imencode(format, picture, picture_encode);
+		const std::string str_encode(picture_encode.begin(), picture_encode.end());
+		const char* c = str_encode.c_str();
+		j_["mat"] = base64_encode(c, str_encode.size());
+		return 0;
+	}
+int PipeElements::sendJson(){
+		const string s = base64_encode(j_.dump().c_str(), j_.dump().size());
+		const char * sendData = s.c_str();
+		write(writeFd_, sendData, strlen(sendData)+1);
+		return 0;
+	}
+string PipeElements::stringToBase64_(const string& element){
+		const char* c = element.c_str();
+		return base64_encode(c, element.size());
+	}
+string PipeElements::charToBase64_(const vector<uchar>& element){
+		const std::string str(element.begin(), element.end());
+		const char* c = str.c_str();
+		return base64_encode(c, str.size());
+	}
 
 kinectSubject::kinectSubject() {
     std::cout << "hi, I was the kinectSubject.\n";
