@@ -181,7 +181,7 @@ void kinectSubject::cap(k4a_device_t& dev, const int i, const k4a_calibration_t&
 		{
 			colorImage = k4a_capture_get_color_image(element.sensor_capture);//从捕获中获取图像
 			colorTextureBuffer = k4a_image_get_buffer(colorImage);
-
+			//TODO: 准备图片上也许不需要在这转
 			//depthFrame = cv::Mat(depthImage.get_height_pixels(), depthImage.get_width_pixels(), CV_8UC4, depthTextureBuffer.data());
 			std::unique_lock<std::mutex> locker(mtx_[i]);
 			element.colorFrame = cv::Mat(1, k4a_image_get_height_pixels(colorImage) * k4a_image_get_width_pixels(colorImage), CV_8UC1, colorTextureBuffer);

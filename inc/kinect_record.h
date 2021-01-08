@@ -94,12 +94,25 @@ struct oneElement {
 	k4abt_skeleton_t skeleton;
 };
 
-//观测者接口
+//通信接口
+class socketOb{
+public:
+	virtual ~socketOb() {};
+	virtual int getAPicture(const Mat& picture, const string& format) = 0;
+	virtual int getString(const string& element, const string& elementName) = 0;
+	virtual int sendJson() = 0;
+	virtual int findObserve(const bool& tmpFlag);//tmpFlag防止程序一直寻找
+};
+
+//相机观测者接口
 class IObserver {
 public:
+	int number_;
 	virtual ~IObserver() {};
 	virtual void Update(oneElement* element) = 0;
 	virtual void OnlyShowMat(const cv::Mat& colorFrame) = 0;
+	virtual void Attach(socketOb* pipeTarget) = 0;
+	virtual void Detach(socketOb* pipeTarget) = 0;
 };
 
 //主题接口
@@ -109,6 +122,74 @@ public:
 	virtual void Attach(IObserver* observer) = 0;
 	virtual void Detach(IObserver* observer) = 0;
 	//virtual void Notify() = 0;
+};
+
+class PipeElements : public socketOb{
+public:
+	//构造函数保证了写通道的建立
+	PipeElements(const string& writeFifo, const string& readFifo, IObserver& observerTarget):\
+	observer_(observerTarget),\
+	index_(PipeElements::static_number_),\
+	writeFifo_(writeFifo + to_string(index_)),\
+	readFifo_(readFifo + to_string(index_)){
+		this->observer_.Attach(this);
+		//可见从0编号
+		cout << "Hi, I'm the pipElement \"" << PipeElements::static_number_++ << "\".\n";	
+		if(access(readFifo_.c_str(), F_OK) < 0) cout << "A readFifo_" << index_ << "exist" << endl;
+		if( (writeFd_ = open(writeFifo_.c_str(), O_WRONLY)) < 0){
+			unlink(writeFifo_.c_str());            //如果失败，删除
+			ERR_EXIT("open write_fifo err.");
+		}
+		cout << "Hi, I'm the PipeElements \"" << ++PipeElements::static_number_ << "\".\n";
+	}
+
+	~PipeElements(){
+		RemoveMeFromTheList();
+		cout << "Goodbye, I was the pipeELement \"" << this->index_ << "\".\n";
+		unlink(writeFifo_.c_str()); 
+	}
+
+	virtual void RemoveMeFromTheList() {
+		observer_.Detach(this);
+		cout << "Observer \"" << index_ << "\" removed from the list.\n" << endl;
+	}
+
+	int getAPicture(const Mat& picture, const string& format) override;
+
+	int getString(const string& element, const string& elementName) override{
+		j_[elementName] = stringToBase64_(element);
+		return 0;
+	}
+
+	int sendJson() override;
+
+	int findObserve(const bool& tmpFlag) override{
+		while(open(readFifo_.c_str(), O_RDONLY) <0){
+			sleep(1);
+			cout << "waiting observe" << endl;//原理上是在保证readFifo_为observe建立
+			if(tmpFlag)
+			{
+				break;
+			}
+		}
+		return 0;
+	}
+
+	uint getIndex_(){
+		return this->index_;
+	}
+
+private:
+	IObserver& observer_;
+	const string writeFifo_;
+	const string readFifo_;
+	int writeFd_;
+	const uint index_;
+	static uint static_number_;
+	json j_;
+	string stringToBase64_(const string& element);
+	string charToBase64_(const vector<uchar>& element);
+
 };
 
 //kinect主题
@@ -161,6 +242,7 @@ public:
 		for (int i = 0; i < JOINT_NUM * 3 + 1; i++) this->fJoint_[i] = NULL;
 	}
 	virtual ~Observer() {
+		RemoveMeFromTheList();
 		cout << "Goodbye, I was the Observer \"" << this->number_ << "\".\n";
 	}
 
@@ -190,13 +272,20 @@ public:
 		//std::unique_lock<std::mutex> locker(mtx);
 		return &element_->colorFrame;
 	}
+
+	virtual void Attach(socketOb* pipeTarget) override {
+		list_pipe_.push_back(pipeTarget);
+	}
+	virtual void Detach(socketOb* pipeTarget) override {
+		list_pipe_.remove(pipeTarget);
+	}
 private:
+	std::list<socketOb*> list_pipe_;
 	//std::string message_from_subject_;
 	//std::mutex mtx;
 	oneElement* element_;
 	ISubject& subject_;
 	static int static_number_;
-	int number_;
 	float fJoint_[JOINT_NUM * 3 + 1];
 
 	void PrintInfo() {
@@ -208,62 +297,22 @@ private:
 			fJoint_[i * 3 + 2] = element_->skeleton.joints[i].position.xyz.y;//传递的为向量的数组指针
 			fJoint_[i * 3 + 3] = element_->skeleton.joints[i].position.xyz.z;//传递的为向量的数组指针
 		}
+		//TODO:处理数据并压如json
+		//发送json，之前请准备好数据
+		std::list<socketOb*>::iterator iterator = list_pipe_.begin();
+		HowManyObserver();
+		while (iterator != list_pipe_.end()) {
+			(*iterator)->sendJson();
+			++iterator;
+		}
 
+	}
+
+	void HowManyObserver() {
+		std::cout << "There are " << list_pipe_.size() << " observers in the list.\n";
 	}
 };
 
-class PipeElements{
-public:
-	//构造函数保证了写通道的建立
-	PipeElements(const string& writeFifo, const string& readFifo, const uint& index = 0):\
-	index_(index),\
-	writeFifo_(writeFifo + to_string(index)),\
-	readFifo_(readFifo + to_string(index)){	
-		if(access(readFifo_.c_str(), F_OK) < 0) cout << "A readFifo_" << index_ << "exist" << endl;
-		if( (writeFd_ = open(writeFifo_.c_str(), O_WRONLY)) < 0){
-			unlink(writeFifo_.c_str());            //如果失败，删除
-			ERR_EXIT("open write_fifo err.");
-		}
-		cout << "Hi, I'm the PipeElements \"" << ++PipeElements::static_number_ << "\".\n";
-	}
-
-	~PipeElements(){
-		cout << "Goodbye, I was the pipeELement \"" << this->index_ << "\".\n";
-		unlink(writeFifo_.c_str()); 
-	}
-
-	int getAPicture(const Mat& picture, const string& format);
-
-	int getString(const string& element, const string& elementName) {
-		j_[elementName] = stringToBase64_(element);
-		return 0;
-	}
-
-	int sendJson();
-
-	int findObserve(const bool& tmpFlag){
-		while(open(readFifo_.c_str(), O_RDONLY) <0){
-			sleep(1);
-			cout << "waiting observe" << endl;//原理上是在保证readFifo_为observe建立
-			if(tmpFlag)
-			{
-				break;
-			}
-		}
-		return 0;
-	}
-
-private:
-	const string writeFifo_;
-	const string readFifo_;
-	int writeFd_;
-	const uint index_;
-	static uint static_number_;
-	json j_;
-	string stringToBase64_(const string& element);
-	string charToBase64_(const vector<uchar>& element);
-
-};
 
 
 

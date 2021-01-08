@@ -10,13 +10,14 @@ uint PipeElements::static_number_ = 0;
 
 kinectSubject* kinect = nullptr;
 std::list<IObserver*> list_observer;
+std::list<PipeElements*> list_pipeElements;
 
-Observer* getIteratorin(int i){
-	list<IObserver*>::iterator iterator = list_observer.begin();
+template <typename T> T* getIteratorin(std::list<T*> list,int i){
+	typename list<T*>::iterator iterator = list.begin();
 	for (int j = i; j > 0; --j) {
 			++iterator;
 		}
-	return (Observer*)(*iterator);
+	return (T*)(*iterator);
 }
 
 void* getKinectSubject() {
@@ -47,23 +48,38 @@ uint getObserver() {
 }
 
 int removeObserver(int i){
-	Observer* observeTarget = getIteratorin(i);
+	Observer* observeTarget = (Observer*)getIteratorin<IObserver>(list_observer,i);
 	list_observer.remove(observeTarget);//未验证的remove函数
 	observeTarget->RemoveMeFromTheList();
 	return 0;
 }
  
 float* getJoint(int i) {
-	Observer* observeTarget = getIteratorin(i);
+	Observer* observeTarget = (Observer*)getIteratorin<IObserver>(list_observer,i);
 	return observeTarget->getJoint();
 }
 
 cv::Mat* getMat(int i) {
-	Observer* observeTarget = getIteratorin(i);
+	Observer* observeTarget = (Observer*)getIteratorin<IObserver>(list_observer,i);
 	return observeTarget->getMat();
 }
 
 bool getMatFlag(int i){
-	Observer* observeTarget = getIteratorin(i);
+	Observer* observeTarget = (Observer*)getIteratorin<IObserver>(list_observer,i);
 	return observeTarget->matFlag;
 }
+
+//i代表对应observe的编号
+uint getPipeElements(int i) {
+	IObserver* observeTarget = getIteratorin<IObserver>(list_observer,i);
+	list_pipeElements.push_back(new PipeElements(write_fifo, read_fifo, *observeTarget));
+	return list_pipeElements.size();
+}
+
+int removePipeElements(int i){
+	PipeElements* pipeTarget = (PipeElements*)getIteratorin<PipeElements>(list_pipeElements,i);
+	list_pipeElements.remove(pipeTarget);//未验证的remove函数
+	pipeTarget->RemoveMeFromTheList();
+	return 0;
+}
+

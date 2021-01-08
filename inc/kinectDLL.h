@@ -29,6 +29,9 @@ extern "C"
     EXPORT_API float* getJoint(int i);
     EXPORT_API cv::Mat* getMat(int i);
     EXPORT_API bool getMatFlag(int i);
+    EXPORT_API uint getPipeElements();
 }
+const std::string write_fifo = "/tmp/write_fifo";
+const std::string read_fifo = "/tmp/read_fifo";
 #endif
 
