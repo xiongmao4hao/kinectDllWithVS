@@ -100,8 +100,9 @@ public:
 	virtual ~socketOb() {};
 	virtual int getAPicture(const Mat& picture, const string& format) = 0;
 	virtual int getString(const string& element, const string& elementName) = 0;
+	virtual int getVector(const vector<float>&element, const string& elementName) = 0;
 	virtual int sendJson() = 0;
-	virtual int findObserve(const bool& tmpFlag);//tmpFlag防止程序一直寻找
+	virtual int findObserve(const bool& tmpFlag) = 0;//tmpFlag防止程序一直寻找
 };
 
 //相机观测者接口
@@ -126,21 +127,39 @@ public:
 
 class PipeElements : public socketOb{
 public:
+	string intToString(int v)
+	{
+		char buf[32] = {0};
+		snprintf(buf, sizeof(buf), "%u", v);
+	
+		string str = buf;
+		return str;
+	};
 	//构造函数保证了写通道的建立
 	PipeElements(const string& writeFifo, const string& readFifo, IObserver& observerTarget):\
 	observer_(observerTarget),\
 	index_(PipeElements::static_number_),\
-	writeFifo_(writeFifo + to_string(index_)),\
-	readFifo_(readFifo + to_string(index_)){
+	writeFifo_(writeFifo + to_string(PipeElements::static_number_)),\
+	readFifo_(readFifo + intToString(PipeElements::static_number_)){
 		this->observer_.Attach(this);
 		//可见从0编号
-		cout << "Hi, I'm the pipElement \"" << PipeElements::static_number_++ << "\".\n";	
-		if(access(readFifo_.c_str(), F_OK) < 0) cout << "A readFifo_" << index_ << "exist" << endl;
+		cout << "Hi, I'm the pipElement \"" << PipeElements::static_number_++ << "\".\n";
+		//if(access(readFifo_.c_str(), F_OK) < 0) cout << "no readFifo_" << index_ << "exist" << endl;
+		int res;
+		remove(readFifo_.c_str());
+		if( (res = mkfifo(readFifo_.c_str(), O_CREAT|O_EXCL|0755)) < 0)
+			ERR_EXIT("mkfifo err.");
+		remove(writeFifo_.c_str());
+		if( (res = mkfifo(writeFifo_.c_str(), O_CREAT|O_EXCL|0755)) < 0)
+			ERR_EXIT("mkfifo err.");
 		if( (writeFd_ = open(writeFifo_.c_str(), O_WRONLY)) < 0){
 			unlink(writeFifo_.c_str());            //如果失败，删除
 			ERR_EXIT("open write_fifo err.");
 		}
-		cout << "Hi, I'm the PipeElements \"" << ++PipeElements::static_number_ << "\".\n";
+		if( (readFd_ = open(readFifo_.c_str(), O_RDONLY)) < 0){
+			sleep(1);
+		}
+		
 	}
 
 	~PipeElements(){
@@ -156,8 +175,13 @@ public:
 
 	int getAPicture(const Mat& picture, const string& format) override;
 
+	int getVector(const vector<float>& element, const string& elementName)override{
+		j_[elementName] = element;
+		return 0;
+	}
+
 	int getString(const string& element, const string& elementName) override{
-		j_[elementName] = stringToBase64_(element);
+		j_[elementName] = element;
 		return 0;
 	}
 
@@ -175,7 +199,7 @@ public:
 		return 0;
 	}
 
-	uint getIndex_(){
+	int getIndex_(){
 		return this->index_;
 	}
 
@@ -184,8 +208,9 @@ private:
 	const string writeFifo_;
 	const string readFifo_;
 	int writeFd_;
-	const uint index_;
-	static uint static_number_;
+	int readFd_;
+	const int index_;
+	static int static_number_;
 	json j_;
 	string stringToBase64_(const string& element);
 	string charToBase64_(const vector<uchar>& element);
@@ -196,7 +221,7 @@ private:
 class  kinectSubject : public ISubject {
 public:
 	uint32_t uintNum_, iMasterNum_ = 1;
-	std::mutex* mtx_;
+	//std::mutex* mtx_;
 
 	kinectSubject();
 	virtual ~kinectSubject();
@@ -234,12 +259,11 @@ private:
 
 class  Observer : public IObserver {
 public:
-	volatile bool matFlag = false;
+	//volatile bool matFlag = false;
 	Observer(ISubject& subject) : subject_(subject) {
 		this->subject_.Attach(this);
-		cout << "Hi, I'm the Observer \"" << ++Observer::static_number_ << "\".\n";
-		this->number_ = Observer::static_number_;
-		for (int i = 0; i < JOINT_NUM * 3 + 1; i++) this->fJoint_[i] = NULL;
+		cout << "Hi, I'm the Observer \"" << Observer::static_number_ << "\".\n";
+		this->number_ = Observer::static_number_++;
 	}
 	virtual ~Observer() {
 		RemoveMeFromTheList();
@@ -249,7 +273,7 @@ public:
 	virtual void Update(oneElement* element) override {
 		//std::unique_lock<std::mutex> locker(mtx);
 		element_ = element;
-		matFlag = true;
+		//matFlag = true;
 		//locker.unlock();
 		cout << "get element" << endl;
 		PrintInfo();
@@ -258,22 +282,25 @@ public:
 		subject_.Detach(this);
 		cout << "Observer \"" << number_ << "\" removed from the list.\n" << endl;
 	}
-	virtual float* getJoint() {
-		return this->fJoint_;
-	}
+	// virtual vector<float> getJoint() {
+	// 	return this->fJoint_;
+	// }
 	virtual void OnlyShowMat(const cv::Mat& colorFrame){
 		element_->colorFrame = colorFrame;
-		matFlag = true;
+		//matFlag = true;
+		cout << "only get mat" << endl;
+		PrintInfo();
 	}
-	virtual cv::Mat* getMat(){
-		while (!matFlag){
-			cout << "please wait" << endl;
-		}
-		//std::unique_lock<std::mutex> locker(mtx);
-		return &element_->colorFrame;
-	}
+	// virtual cv::Mat* getMat(){
+	// 	while (!matFlag){
+	// 		cout << "please wait" << endl;
+	// 	}
+	// 	//std::unique_lock<std::mutex> locker(mtx);_
+	// 	return &element_->colorFrame;
+	// }
 
 	virtual void Attach(socketOb* pipeTarget) override {
+		cout << "attach pipe" << endl;
 		list_pipe_.push_back(pipeTarget);
 	}
 	virtual void Detach(socketOb* pipeTarget) override {
@@ -286,22 +313,28 @@ private:
 	oneElement* element_;
 	ISubject& subject_;
 	static int static_number_;
-	float fJoint_[JOINT_NUM * 3 + 1];
+	//float fJoint_[JOINT_NUM * 3 + 1];
+	vector<float> fJoint_;
 
 	void PrintInfo() {
 		//std::cout << "Observer \"" << this->number_ << "\": a new message is available --> " << this->message_from_subject_ << "\n";
-		fJoint_[0] = element_->timeStamp;
+		//清空
+		fJoint_.clear();
+		fJoint_.push_back(element_->timeStamp);
 		for (int i = 0; i < JOINT_NUM; i++)
 		{
-			fJoint_[i * 3 + 1] = element_->skeleton.joints[i].position.xyz.x;//传递的为向量的数组指针
-			fJoint_[i * 3 + 2] = element_->skeleton.joints[i].position.xyz.y;//传递的为向量的数组指针
-			fJoint_[i * 3 + 3] = element_->skeleton.joints[i].position.xyz.z;//传递的为向量的数组指针
+			fJoint_.push_back(element_->skeleton.joints[i].position.xyz.x);//传递的为向量的数组指针
+			fJoint_.push_back(element_->skeleton.joints[i].position.xyz.y);//传递的为向量的数组指针
+			fJoint_.push_back(element_->skeleton.joints[i].position.xyz.z);//传递的为向量的数组指针
 		}
-		//TODO:处理数据并压如json
+		//TODO:处理数据并压入json
+		
 		//发送json，之前请准备好数据
 		std::list<socketOb*>::iterator iterator = list_pipe_.begin();
 		HowManyObserver();
 		while (iterator != list_pipe_.end()) {
+			(*iterator)->getVector(fJoint_,"joints");
+			(*iterator)->getAPicture(element_->colorFrame,".jpg");
 			(*iterator)->sendJson();
 			++iterator;
 		}
@@ -309,7 +342,7 @@ private:
 	}
 
 	void HowManyObserver() {
-		std::cout << "There are " << list_pipe_.size() << " observers in the list.\n";
+		std::cout << "There are " << list_pipe_.size() << " pipe in the list.\n";
 	}
 };
 

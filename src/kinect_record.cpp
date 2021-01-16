@@ -8,15 +8,24 @@ using json = nlohmann::json;
 
 int PipeElements::getAPicture(const Mat& picture, const string& format){
 		std::vector<unsigned char> picture_encode; 
-		int res2 = imencode(format, picture, picture_encode);
-		const std::string str_encode(picture_encode.begin(), picture_encode.end());
-		const char* c = str_encode.c_str();
-		j_["mat"] = base64_encode(c, str_encode.size());
+		double scale = 0.1;
+		Size dsize = Size(picture.cols*scale,picture.rows*scale);
+		Mat picture2 = Mat(dsize,CV_32S);
+		resize(picture,picture2,dsize);
+		int res2 = imencode(format, picture2, picture_encode);
+		j_["mat"] = picture_encode;
 		return 0;
 	}
 int PipeElements::sendJson(){
+		ssize_t ret;
+		char recvbuff[512];
+		if( (ret = read(readFd_, recvbuff, 512)) < 0)
+			ERR_EXIT("read err.");
+		printf("%s\n", recvbuff);
 		const string s = base64_encode(j_.dump().c_str(), j_.dump().size());
 		const char * sendData = s.c_str();
+		cout << "the lengh of sendDate is" << strlen(sendData)+1 << endl;
+		cout << j_.dump() << endl;
 		write(writeFd_, sendData, strlen(sendData)+1);
 		return 0;
 	}
@@ -44,7 +53,7 @@ kinectSubject::~kinectSubject() {
 
 int kinectSubject::recordStart()
 {
-	std::cout << "Goodbye, I was the kinectSubject.\n";
+	//std::cout << "Goodbye, I was the kinectSubject.\n";
 	recordStop();
 	VERIFY(init(), "kinect inint failed!");//初始化,启动相机
 	return 0;
@@ -68,7 +77,7 @@ int kinectSubject::init()
 	}
 	//初始化为NULL但是会造成程序在k4a_record_close时报错，于是在后续的if中解决了此问题
 	dev_ = new k4a_device_t[uintNum_];
-	mtx_ = new mutex[uintNum_];
+	//mtx_ = new mutex[uintNum_];
 	k4a_device_configuration_t* config = new k4a_device_configuration_t[uintNum_];
 	sensorCalibration_ = new k4a_calibration_t[uintNum_];
 
@@ -176,27 +185,26 @@ void kinectSubject::cap(k4a_device_t& dev, const int i, const k4a_calibration_t&
 	VERIFY(k4abt_tracker_create(&sensorCalibration, tracker_config, &tracker), "Body tracker initialization failed!");
 	while (1)
 	{
-		cout << "??99" << endl;
 		if (k4a_device_get_capture(dev, &element.sensor_capture, K4A_WAIT_INFINITE) == K4A_WAIT_RESULT_SUCCEEDED)
 		{
 			colorImage = k4a_capture_get_color_image(element.sensor_capture);//从捕获中获取图像
 			colorTextureBuffer = k4a_image_get_buffer(colorImage);
 			//TODO: 准备图片上也许不需要在这转
 			//depthFrame = cv::Mat(depthImage.get_height_pixels(), depthImage.get_width_pixels(), CV_8UC4, depthTextureBuffer.data());
-			std::unique_lock<std::mutex> locker(mtx_[i]);
+			//std::unique_lock<std::mutex> locker(mtx_[i]);
 			element.colorFrame = cv::Mat(1, k4a_image_get_height_pixels(colorImage) * k4a_image_get_width_pixels(colorImage), CV_8UC1, colorTextureBuffer);
 			element.colorFrame = imdecode(element.colorFrame, IMREAD_COLOR);
 			k4a_image_release(colorImage);
 			cvtColor(element.colorFrame, element.colorFrame, COLOR_BGRA2BGR);
-			locker.unlock();
+			//locker.unlock();
 			if (element.colorFrame.data == NULL)
 			{
 				cout << "colorframe imdecode erro" << endl;
 			}
 			onePicture(tracker, &element, iterator);
 			
-			//imshow("Kinect color frame" + std::to_string(i), colorFrame);
-			//waitKey(1);//窗口的要等待时间，当显示图片时，窗口不用实时更新，所以imshow之前不加waitKey也是可以的，但若显示实时的视频，就必须加waitKey
+			imshow("Kinect color frame" + std::to_string(i), element.colorFrame);
+			waitKey(1);//窗口的要等待时间，当显示图片时，窗口不用实时更新，所以imshow之前不加waitKey也是可以的，但若显示实时的视频，就必须加waitKey
 			k4a_capture_release(element.sensor_capture);
 		}
 		else if (k4a_device_get_capture(dev, &element.sensor_capture, K4A_WAIT_INFINITE) == K4A_WAIT_RESULT_FAILED)

@@ -26,10 +26,11 @@ extern "C"
     EXPORT_API int stop();
     EXPORT_API uint getObserver();
     EXPORT_API int removeObserver(int i);
-    EXPORT_API float* getJoint(int i);
-    EXPORT_API cv::Mat* getMat(int i);
-    EXPORT_API bool getMatFlag(int i);
-    EXPORT_API uint getPipeElements();
+    // EXPORT_API float* getJoint(int i);
+    // EXPORT_API cv::Mat* getMat(int i);
+    // EXPORT_API bool getMatFlag(int i);
+    EXPORT_API uint getPipeElements(int i);
+    EXPORT_API int removePipeElements(int i);
 }
 const std::string write_fifo = "/tmp/write_fifo";
 const std::string read_fifo = "/tmp/read_fifo";

@@ -6,7 +6,7 @@ using namespace cv;
 using namespace std;
 
 int Observer::static_number_ = 0;
-uint PipeElements::static_number_ = 0;
+int PipeElements::static_number_ = 0;
 
 kinectSubject* kinect = nullptr;
 std::list<IObserver*> list_observer;
@@ -54,20 +54,20 @@ int removeObserver(int i){
 	return 0;
 }
  
-float* getJoint(int i) {
-	Observer* observeTarget = (Observer*)getIteratorin<IObserver>(list_observer,i);
-	return observeTarget->getJoint();
-}
+// float* getJoint(int i) {
+// 	Observer* observeTarget = (Observer*)getIteratorin<IObserver>(list_observer,i);
+// 	return observeTarget->getJoint();
+// }
 
-cv::Mat* getMat(int i) {
-	Observer* observeTarget = (Observer*)getIteratorin<IObserver>(list_observer,i);
-	return observeTarget->getMat();
-}
+// cv::Mat* getMat(int i) {
+// 	Observer* observeTarget = (Observer*)getIteratorin<IObserver>(list_observer,i);
+// 	return observeTarget->getMat();
+// }
 
-bool getMatFlag(int i){
-	Observer* observeTarget = (Observer*)getIteratorin<IObserver>(list_observer,i);
-	return observeTarget->matFlag;
-}
+// bool getMatFlag(int i){
+// 	Observer* observeTarget = (Observer*)getIteratorin<IObserver>(list_observer,i);
+// 	return observeTarget->matFlag;
+// }
 
 //i代表对应observe的编号
 uint getPipeElements(int i) {
