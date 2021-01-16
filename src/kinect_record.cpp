@@ -36,8 +36,8 @@ int PipeElements::getAPicture(const Mat& picture, const string& elementName){
 	}
 int PipeElements::sendJson(){
 		ssize_t ret;
-		char recvbuff[512];
-		if( (ret = read(readFd_, recvbuff, 512)) < 0)
+		char recvbuff[15];
+		if( (ret = read(readFd_, recvbuff, 15)) < 0)
 			ERR_EXIT("read err.");
 		printf("%s\n", recvbuff);
 		const string s = base64_encode(j_.dump().c_str(), j_.dump().size());
@@ -169,6 +169,7 @@ int kinectSubject::reKinct()
 	delete[] tids_;
 	delete[] sensorCalibration_;
 	delete[] dev_;
+	delete[] piture_;
 	//进程关闭flag重置
 	bDel_ = false;
 	bInitFlag_ = false;
@@ -202,6 +203,7 @@ void kinectSubject::cap(k4a_device_t& dev, const int i, const k4a_calibration_t&
 	k4abt_tracker_t tracker = NULL;
 	k4abt_tracker_configuration_t tracker_config = K4ABT_TRACKER_CONFIG_DEFAULT;
 	VERIFY(k4abt_tracker_create(&sensorCalibration, tracker_config, &tracker), "Body tracker initialization failed!");
+	cv::Mat tmp;
 	while (1)
 	{
 		if (k4a_device_get_capture(dev, &element.sensor_capture, K4A_WAIT_INFINITE) == K4A_WAIT_RESULT_SUCCEEDED)
@@ -209,11 +211,16 @@ void kinectSubject::cap(k4a_device_t& dev, const int i, const k4a_calibration_t&
 			colorImage = k4a_capture_get_color_image(element.sensor_capture);//从捕获中获取图像
 			colorTextureBuffer = k4a_image_get_buffer(colorImage);
 			//depthFrame = cv::Mat(depthImage.get_height_pixels(), depthImage.get_width_pixels(), CV_8UC4, depthTextureBuffer.data());
-			piture_[i] = cv::Mat(1, k4a_image_get_height_pixels(colorImage) * k4a_image_get_width_pixels(colorImage), CV_8UC1, colorTextureBuffer);
-			piture_[i] = imdecode(piture_[i], IMREAD_COLOR);
+			tmp = cv::Mat(1, k4a_image_get_height_pixels(colorImage) * k4a_image_get_width_pixels(colorImage), CV_8UC1, colorTextureBuffer);
+			tmp = imdecode(tmp, IMREAD_COLOR);
 			k4a_image_release(colorImage);
-			cvtColor(piture_[i], piture_[i], COLOR_BGRA2BGR);//RGBA转RGB
-			element.colorFrame = &piture_[i];
+			cvtColor(tmp, tmp, COLOR_BGRA2BGR);//RGBA转RGB
+			// double scale = 0.5;
+			// Size dsize = Size(tmp.cols*scale,tmp.rows*scale);
+			// Mat picture2 = Mat(dsize,CV_32S);
+			// resize(tmp,picture2,dsize);		
+			element.colorFrame = &tmp;//&picture2;//piture_[i];
+			
 			if (element.colorFrame->data == NULL)
 			{
 				cout << "colorframe imdecode erro" << endl;
