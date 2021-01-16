@@ -53,26 +53,11 @@ int removeObserver(int i){
 	observeTarget->RemoveMeFromTheList();
 	return 0;
 }
- 
-// float* getJoint(int i) {
-// 	Observer* observeTarget = (Observer*)getIteratorin<IObserver>(list_observer,i);
-// 	return observeTarget->getJoint();
-// }
-
-// cv::Mat* getMat(int i) {
-// 	Observer* observeTarget = (Observer*)getIteratorin<IObserver>(list_observer,i);
-// 	return observeTarget->getMat();
-// }
-
-// bool getMatFlag(int i){
-// 	Observer* observeTarget = (Observer*)getIteratorin<IObserver>(list_observer,i);
-// 	return observeTarget->matFlag;
-// }
 
 //i代表对应observe的编号
 uint getPipeElements(int i) {
 	IObserver* observeTarget = getIteratorin<IObserver>(list_observer,i);
-	list_pipeElements.push_back(new PipeElements(write_fifo, read_fifo, *observeTarget));
+	list_pipeElements.push_back(new PipeElements(write_fifo, read_fifo, mmap_fifo,*observeTarget));
 	return list_pipeElements.size();
 }
 

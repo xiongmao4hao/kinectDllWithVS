@@ -34,5 +34,6 @@ extern "C"
 }
 const std::string write_fifo = "/tmp/write_fifo";
 const std::string read_fifo = "/tmp/read_fifo";
+const std::string mmap_fifo = "/tmp/mmap_fifo";
 #endif
 

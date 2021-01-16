@@ -164,6 +164,7 @@ public:
 			unlink(writeFifo_.c_str());            //如果失败，删除
 			ERR_EXIT("open readFifo_ err.");
 		}
+		remove(mmapFifo_.c_str());
 		//读取共享内存的文件
 		fd_ = open(mmapFifo_.c_str(),O_RDWR|O_CREAT|O_TRUNC,0644);
 		if(fd_ < 0)
@@ -333,7 +334,7 @@ private:
 		HowManyObserver();
 		while (iterator != list_pipe_.end()) {
 			(*iterator)->getVector(fJoint_,"joints");
-			(*iterator)->getAPicture(element_->colorFrame,".jpg");
+			(*iterator)->getAPicture(element_->colorFrame,"pictureInfo");
 			(*iterator)->sendJson();
 			++iterator;
 		}
