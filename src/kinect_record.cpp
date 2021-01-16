@@ -95,6 +95,7 @@ int kinectSubject::init()
 	}
 	//初始化为NULL但是会造成程序在k4a_record_close时报错，于是在后续的if中解决了此问题
 	dev_ = new k4a_device_t[uintNum_];
+	piture_ = new cv::Mat[uintNum_];
 	//mtx_ = new mutex[uintNum_];
 	k4a_device_configuration_t* config = new k4a_device_configuration_t[uintNum_];
 	sensorCalibration_ = new k4a_calibration_t[uintNum_];
@@ -207,15 +208,13 @@ void kinectSubject::cap(k4a_device_t& dev, const int i, const k4a_calibration_t&
 		{
 			colorImage = k4a_capture_get_color_image(element.sensor_capture);//从捕获中获取图像
 			colorTextureBuffer = k4a_image_get_buffer(colorImage);
-			//TODO: 准备图片上也许不需要在这转
 			//depthFrame = cv::Mat(depthImage.get_height_pixels(), depthImage.get_width_pixels(), CV_8UC4, depthTextureBuffer.data());
-			//std::unique_lock<std::mutex> locker(mtx_[i]);
-			element.colorFrame = cv::Mat(1, k4a_image_get_height_pixels(colorImage) * k4a_image_get_width_pixels(colorImage), CV_8UC1, colorTextureBuffer);
-			element.colorFrame = imdecode(element.colorFrame, IMREAD_COLOR);
+			piture_[i] = cv::Mat(1, k4a_image_get_height_pixels(colorImage) * k4a_image_get_width_pixels(colorImage), CV_8UC1, colorTextureBuffer);
+			piture_[i] = imdecode(piture_[i], IMREAD_COLOR);
 			k4a_image_release(colorImage);
-			cvtColor(element.colorFrame, element.colorFrame, COLOR_BGRA2BGR);//RGBA转RGB
-			//locker.unlock();
-			if (element.colorFrame.data == NULL)
+			cvtColor(piture_[i], piture_[i], COLOR_BGRA2BGR);//RGBA转RGB
+			element.colorFrame = &piture_[i];
+			if (element.colorFrame->data == NULL)
 			{
 				cout << "colorframe imdecode erro" << endl;
 			}
@@ -258,12 +257,12 @@ int kinectSubject::onePicture(k4abt_tracker_t& tracker, \
 	{
 		// It should never hit timeout when K4A_WAIT_INFINITE is set.
 		cout << "Error! Add capture to tracker process queue timeout!\n" << endl;
-		(*iterator)->OnlyShowMat(element->colorFrame);
+		(*iterator)->OnlyShowMat(*element->colorFrame);
 	}
 	else if (queue_capture_result == K4A_WAIT_RESULT_FAILED)
 	{
 		cout << "Error! Add capture to tracker process queue failed!\n" << endl;
-		(*iterator)->OnlyShowMat(element->colorFrame);
+		(*iterator)->OnlyShowMat(*element->colorFrame);
 	}
 	else
 	{

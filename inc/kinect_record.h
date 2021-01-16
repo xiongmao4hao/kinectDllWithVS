@@ -87,7 +87,7 @@ struct oneElement {
 		//为了保存单独一个相机的关节角度建立的数组
 		for (int i = 0; i < ANGLE_NUM; i++) this->joints_Angel[i] = NULL;
 	};
-	cv::Mat colorFrame;
+	cv::Mat* colorFrame;
 	k4a_capture_t sensor_capture = NULL;//捕获用变量
 	k4abt_frame_t body_frame = NULL;
 	float joints_Angel[ANGLE_NUM];
@@ -112,7 +112,7 @@ public:
 	int number_;
 	virtual ~IObserver() {};
 	virtual void Update(oneElement* element) = 0;
-	virtual void OnlyShowMat(const cv::Mat& colorFrame) = 0;
+	virtual void OnlyShowMat(cv::Mat& colorFrame) = 0;
 	virtual void Attach(socketOb* pipeTarget) = 0;
 	virtual void Detach(socketOb* pipeTarget) = 0;
 };
@@ -264,6 +264,7 @@ private:
 	k4a_device_t* dev_ = nullptr;
 	std::thread* tids_ = nullptr;
 	bool bInitFlag_ = false, bDel_ = false;
+	cv::Mat* piture_ = nullptr;
 
 	int init();
 	int reKinct();
@@ -297,8 +298,8 @@ public:
 		subject_.Detach(this);
 		cout << "Observer \"" << number_ << "\" removed from the list.\n" << endl;
 	}
-	virtual void OnlyShowMat(const cv::Mat& colorFrame){
-		element_->colorFrame = colorFrame;
+	virtual void OnlyShowMat(cv::Mat& colorFrame){
+		element_->colorFrame = &colorFrame;
 		//matFlag = true;
 		cout << "only get mat" << endl;
 		PrintInfo();
@@ -327,14 +328,12 @@ private:
 			fJoint_.push_back(element_->skeleton.joints[i].position.xyz.y);//传递的为向量的数组指针
 			fJoint_.push_back(element_->skeleton.joints[i].position.xyz.z);//传递的为向量的数组指针
 		}
-		//TODO:处理数据并压入json
-		
 		//发送json，之前请准备好数据
 		std::list<socketOb*>::iterator iterator = list_pipe_.begin();
 		HowManyObserver();
 		while (iterator != list_pipe_.end()) {
 			(*iterator)->getVector(fJoint_,"joints");
-			(*iterator)->getAPicture(element_->colorFrame,"pictureInfo");
+			(*iterator)->getAPicture(*element_->colorFrame,"pictureInfo");
 			(*iterator)->sendJson();
 			++iterator;
 		}
