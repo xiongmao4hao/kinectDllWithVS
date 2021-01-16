@@ -73,6 +73,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <string>
+#include <sys/mman.h>
 
 using json = nlohmann::json;
 using namespace cv;
@@ -98,7 +99,7 @@ struct oneElement {
 class socketOb{
 public:
 	virtual ~socketOb() {};
-	virtual int getAPicture(const Mat& picture, const string& format) = 0;
+	virtual int getAPicture(const Mat& picture, const string& elementName) = 0;
 	virtual int getString(const string& element, const string& elementName) = 0;
 	virtual int getVector(const vector<float>&element, const string& elementName) = 0;
 	virtual int sendJson() = 0;
@@ -136,16 +137,18 @@ public:
 		return str;
 	};
 	//构造函数保证了写通道的建立
-	PipeElements(const string& writeFifo, const string& readFifo, IObserver& observerTarget):\
+	PipeElements(const string& writeFifo, const string& readFifo, const string& mmapFifo, IObserver& observerTarget):\
 	observer_(observerTarget),\
 	index_(PipeElements::static_number_),\
 	writeFifo_(writeFifo + to_string(PipeElements::static_number_)),\
-	readFifo_(readFifo + intToString(PipeElements::static_number_)){
+	readFifo_(readFifo + intToString(PipeElements::static_number_)),\
+	mmapFifo_(mmapFifo + intToString(PipeElements::static_number_)){
 		this->observer_.Attach(this);
 		//可见从0编号
 		cout << "Hi, I'm the pipElement \"" << PipeElements::static_number_++ << "\".\n";
 		//if(access(readFifo_.c_str(), F_OK) < 0) cout << "no readFifo_" << index_ << "exist" << endl;
 		int res;
+		//删除老的并建立写和读文件，python那边的open不会等待，这边会
 		remove(readFifo_.c_str());
 		if( (res = mkfifo(readFifo_.c_str(), O_CREAT|O_EXCL|0755)) < 0)
 			ERR_EXIT("mkfifo err.");
@@ -154,12 +157,20 @@ public:
 			ERR_EXIT("mkfifo err.");
 		if( (writeFd_ = open(writeFifo_.c_str(), O_WRONLY)) < 0){
 			unlink(writeFifo_.c_str());            //如果失败，删除
-			ERR_EXIT("open write_fifo err.");
+			ERR_EXIT("open writeFifo_ err.");
 		}
 		if( (readFd_ = open(readFifo_.c_str(), O_RDONLY)) < 0){
-			sleep(1);
+			unlink(readFifo_.c_str());            //如果失败，删除
+			unlink(writeFifo_.c_str());            //如果失败，删除
+			ERR_EXIT("open readFifo_ err.");
 		}
-		
+		//读取共享内存的文件
+		fd_ = open(mmapFifo_.c_str(),O_RDWR|O_CREAT|O_TRUNC,0644);
+		if(fd_ < 0)
+		{
+			perror("open");
+			exit(2);
+		}	
 	}
 
 	~PipeElements(){
@@ -173,7 +184,7 @@ public:
 		cout << "Observer \"" << index_ << "\" removed from the list.\n" << endl;
 	}
 
-	int getAPicture(const Mat& picture, const string& format) override;
+	int getAPicture(const Mat& picture, const string& elementName) override;
 
 	int getVector(const vector<float>& element, const string& elementName)override{
 		j_[elementName] = element;
@@ -207,6 +218,10 @@ private:
 	IObserver& observer_;
 	const string writeFifo_;
 	const string readFifo_;
+	const string mmapFifo_;
+	int fd_;
+	uchar* picture_;
+	int numpySize_ = 0;
 	int writeFd_;
 	int readFd_;
 	const int index_;
@@ -259,7 +274,6 @@ private:
 
 class  Observer : public IObserver {
 public:
-	//volatile bool matFlag = false;
 	Observer(ISubject& subject) : subject_(subject) {
 		this->subject_.Attach(this);
 		cout << "Hi, I'm the Observer \"" << Observer::static_number_ << "\".\n";
@@ -282,23 +296,12 @@ public:
 		subject_.Detach(this);
 		cout << "Observer \"" << number_ << "\" removed from the list.\n" << endl;
 	}
-	// virtual vector<float> getJoint() {
-	// 	return this->fJoint_;
-	// }
 	virtual void OnlyShowMat(const cv::Mat& colorFrame){
 		element_->colorFrame = colorFrame;
 		//matFlag = true;
 		cout << "only get mat" << endl;
 		PrintInfo();
 	}
-	// virtual cv::Mat* getMat(){
-	// 	while (!matFlag){
-	// 		cout << "please wait" << endl;
-	// 	}
-	// 	//std::unique_lock<std::mutex> locker(mtx);_
-	// 	return &element_->colorFrame;
-	// }
-
 	virtual void Attach(socketOb* pipeTarget) override {
 		cout << "attach pipe" << endl;
 		list_pipe_.push_back(pipeTarget);
@@ -308,16 +311,12 @@ public:
 	}
 private:
 	std::list<socketOb*> list_pipe_;
-	//std::string message_from_subject_;
-	//std::mutex mtx;
 	oneElement* element_;
 	ISubject& subject_;
 	static int static_number_;
-	//float fJoint_[JOINT_NUM * 3 + 1];
 	vector<float> fJoint_;
 
 	void PrintInfo() {
-		//std::cout << "Observer \"" << this->number_ << "\": a new message is available --> " << this->message_from_subject_ << "\n";
 		//清空
 		fJoint_.clear();
 		fJoint_.push_back(element_->timeStamp);

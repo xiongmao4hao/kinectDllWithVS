@@ -6,14 +6,32 @@ using namespace cv;
 using namespace std;
 using json = nlohmann::json;
 
-int PipeElements::getAPicture(const Mat& picture, const string& format){
-		std::vector<unsigned char> picture_encode; 
-		double scale = 0.1;
-		Size dsize = Size(picture.cols*scale,picture.rows*scale);
-		Mat picture2 = Mat(dsize,CV_32S);
-		resize(picture,picture2,dsize);
-		int res2 = imencode(format, picture2, picture_encode);
-		j_["mat"] = picture_encode;
+int PipeElements::getAPicture(const Mat& picture, const string& elementName){
+		vector<int> pictureInfo ;
+		pictureInfo.push_back(picture.rows);
+		pictureInfo.push_back(picture.cols);
+		j_[elementName] = pictureInfo;
+		if(numpySize_ != picture.rows*picture.cols*3)
+		{
+			//不是第一次就先释放
+			if(numpySize_ != 0) {
+				if(munmap(picture_,numpySize_)<0){
+					perror("mmumap erro");
+					exit(4);
+				}
+			}
+			//文件拓展大小
+			ftruncate(fd_,picture.rows*picture.cols*3);
+			picture_ = (uchar*)mmap(NULL,picture.rows*picture.cols*3,PROT_READ|PROT_WRITE,MAP_SHARED,fd_,0);//创建一个结构体大小的共享映射区。共享映射区我们可以当做数组区看待。
+			if(picture_ == MAP_FAILED)
+			{
+				perror("mmap erro");
+				exit(3);
+			}
+			numpySize_ = picture.rows*picture.cols*3;
+		}
+		//赋值共享内存
+		memcpy(picture_,picture.data,numpySize_);
 		return 0;
 	}
 int PipeElements::sendJson(){
@@ -195,16 +213,15 @@ void kinectSubject::cap(k4a_device_t& dev, const int i, const k4a_calibration_t&
 			element.colorFrame = cv::Mat(1, k4a_image_get_height_pixels(colorImage) * k4a_image_get_width_pixels(colorImage), CV_8UC1, colorTextureBuffer);
 			element.colorFrame = imdecode(element.colorFrame, IMREAD_COLOR);
 			k4a_image_release(colorImage);
-			cvtColor(element.colorFrame, element.colorFrame, COLOR_BGRA2BGR);
+			cvtColor(element.colorFrame, element.colorFrame, COLOR_BGRA2BGR);//RGBA转RGB
 			//locker.unlock();
 			if (element.colorFrame.data == NULL)
 			{
 				cout << "colorframe imdecode erro" << endl;
 			}
 			onePicture(tracker, &element, iterator);
-			
-			imshow("Kinect color frame" + std::to_string(i), element.colorFrame);
-			waitKey(1);//窗口的要等待时间，当显示图片时，窗口不用实时更新，所以imshow之前不加waitKey也是可以的，但若显示实时的视频，就必须加waitKey
+			// imshow("Kinect color frame" + std::to_string(i), element.colorFrame);
+			// waitKey(1);//窗口的要等待时间，当显示图片时，窗口不用实时更新，所以imshow之前不加waitKey也是可以的，但若显示实时的视频，就必须加waitKey
 			k4a_capture_release(element.sensor_capture);
 		}
 		else if (k4a_device_get_capture(dev, &element.sensor_capture, K4A_WAIT_INFINITE) == K4A_WAIT_RESULT_FAILED)
