@@ -39,11 +39,11 @@ int PipeElements::sendJson(){
 		char recvbuff[512];
 		if( (ret = read(readFd_, recvbuff, 512)) < 0)
 			ERR_EXIT("read err.");
-		cout << ret << endl;
+		//cout << ret << endl;
 		//如果有接收端就发送
 		if(ret != 0)
 		{
-			printf("%s\n", recvbuff);
+			//printf("%s\n", recvbuff);
 			const string s = base64_encode(j_.dump().c_str(), j_.dump().size());
 			const char * sendData = s.c_str();
 			// cout << "the lengh of sendDate is" << strlen(sendData)+1 << endl;
@@ -70,7 +70,7 @@ kinectSubject::kinectSubject() {
 
 kinectSubject::~kinectSubject() {
     std::cout << "Goodbye, I was the kinectSubject.\n";
-    del();
+    VERIFY(del(), "kinect del failed!");//关闭相机捕获
 	cout << "Kinct delete done" << endl;
   }
 
@@ -264,7 +264,7 @@ int kinectSubject::onePicture(k4abt_tracker_t& tracker, \
 {
 	//捕获并写入人体骨架
 	k4a_wait_result_t queue_capture_result = \
-		k4abt_tracker_enqueue_capture(tracker, element->sensor_capture, K4A_WAIT_INFINITE);//????????
+		k4abt_tracker_enqueue_capture(tracker, element->sensor_capture, K4A_WAIT_INFINITE);//异步提取骨骼信息
 	if (queue_capture_result == K4A_WAIT_RESULT_TIMEOUT)
 	{
 		// It should never hit timeout when K4A_WAIT_INFINITE is set.
@@ -281,7 +281,7 @@ int kinectSubject::onePicture(k4abt_tracker_t& tracker, \
 		
 		k4a_wait_result_t pop_frame_result = \
 			k4abt_tracker_pop_result(tracker, &element->body_frame, K4A_WAIT_INFINITE);
-		element->timeStamp = k4abt_frame_get_device_timestamp_usec(element->body_frame);//?????
+		element->timeStamp = k4abt_frame_get_device_timestamp_usec(element->body_frame);//获取时间戳
 		// 骨骼点数据清除和计算人数
 		uint32_t numBodies = k4abt_frame_get_num_bodies(element->body_frame);
 		if (pop_frame_result == K4A_WAIT_RESULT_SUCCEEDED)
@@ -293,9 +293,9 @@ int kinectSubject::onePicture(k4abt_tracker_t& tracker, \
 
 			if (get_body_skeleton == K4A_RESULT_SUCCEEDED)
 			{
-				cout << "have joints\n" << endl;
+				//cout << "have joints\n" << endl;
 				/***************求角度*******************/
-				JointsPositionToAngel(element->skeleton, &element->joints_Angel);//必须传入地址&，joints_Angel虽然值相同但是数据类型有问题
+				// JointsPositionToAngel(element->skeleton, &element->joints_Angel);//必须传入地址&，joints_Angel虽然值相同但是数据类型有问题
 			}
 			else if (get_body_skeleton == K4A_RESULT_FAILED)
 			{

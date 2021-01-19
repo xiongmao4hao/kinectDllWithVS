@@ -86,15 +86,15 @@ using namespace std;
 
 //数据保存用结构体
 struct oneElement {
-	oneElement()
-	{
-		//为了保存单独一个相机的关节角度建立的数组
-		for (int i = 0; i < ANGLE_NUM; i++) this->joints_Angel[i] = NULL;
-	};
+	// oneElement()
+	// {
+	// 	//为了保存单独一个相机的关节角度建立的数组
+	// 	for (int i = 0; i < ANGLE_NUM; i++) this->joints_Angel[i] = NULL;
+	// };
 	cv::Mat* colorFrame;
 	k4a_capture_t sensor_capture = NULL;//捕获用变量
 	k4abt_frame_t body_frame = NULL;
-	float joints_Angel[ANGLE_NUM];
+	//float joints_Angel[ANGLE_NUM];
 	uint64_t timeStamp = NULL;
 	k4abt_skeleton_t skeleton;
 };
@@ -132,6 +132,7 @@ public:
 
 class PipeElements : public socketOb{
 public:
+	static int static_number_;
 	string intToString(int v)
 	{
 		char buf[32] = {0};
@@ -194,7 +195,7 @@ public:
 
 	virtual void RemoveMeFromTheList() {
 		observer_.Detach(this);
-		cout << "Observer \"" << index_ << "\" removed from the list.\n" << endl;
+		cout << "pipeElements \"" << index_ << "\" removed from the list.\n" << endl;
 	}
 
 	int getAPicture(const Mat& picture, const string& elementName) override;
@@ -238,7 +239,6 @@ private:
 	int writeFd_;
 	int readFd_;
 	const int index_;
-	static int static_number_;
 	json j_;
 	string stringToBase64_(const string& element);
 	string charToBase64_(const vector<uchar>& element);
@@ -288,10 +288,12 @@ private:
 
 class  Observer : public IObserver {
 public:
+	static int static_number_;
 	Observer(ISubject& subject) : subject_(subject) {
 		this->subject_.Attach(this);
-		cout << "Hi, I'm the Observer \"" << Observer::static_number_ << "\".\n";
-		this->number_ = Observer::static_number_++;
+		// 从0开始标号
+		this->number_ = Observer::static_number_;
+		cout << "Hi, I'm the Observer \"" << Observer::static_number_++ << "\".\n";
 	}
 	virtual ~Observer() {
 		RemoveMeFromTheList();
@@ -303,7 +305,7 @@ public:
 		element_ = element;
 		//matFlag = true;
 		//locker.unlock();
-		cout << "get element" << endl;
+		//cout << "get element" << endl;
 		PrintInfo();
 	}
 	virtual void RemoveMeFromTheList() {
@@ -327,7 +329,6 @@ private:
 	std::list<socketOb*> list_pipe_;
 	oneElement* element_;
 	ISubject& subject_;
-	static int static_number_;
 	vector<float> fJoint_;
 
 	void PrintInfo() {
@@ -342,7 +343,7 @@ private:
 		}
 		//发送json，之前请准备好数据
 		std::list<socketOb*>::iterator iterator = list_pipe_.begin();
-		HowManyObserver();
+		//HowManyObserver();
 		while (iterator != list_pipe_.end()) {
 			(*iterator)->getVector(fJoint_,"joints");
 			(*iterator)->getAPicture(*element_->colorFrame,"pictureInfo");

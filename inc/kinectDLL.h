@@ -19,12 +19,12 @@
 #ifdef __cplusplus
 extern "C"
 {
-    EXPORT_API void* getKinectSubject();
-    EXPORT_API uint32_t getuintNum();
-    EXPORT_API int start();
-    EXPORT_API int cap();
-    EXPORT_API int stop();
-    EXPORT_API uint getObserver();
+    EXPORT_API kinectSubject* getKinectSubject();
+    EXPORT_API uint32_t getuintNum(kinectSubject* kinect);
+    EXPORT_API int start(kinectSubject* kinect);
+    EXPORT_API int cap(kinectSubject* kinect);
+    EXPORT_API int stop(kinectSubject* kinect);
+    EXPORT_API uint getObserver(kinectSubject* kinect);
     EXPORT_API int removeObserver(int i);
     // EXPORT_API float* getJoint(int i);
     // EXPORT_API cv::Mat* getMat(int i);
