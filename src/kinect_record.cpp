@@ -262,7 +262,7 @@ int kinectSubject::capThread()
 int kinectSubject::onePicture(k4abt_tracker_t& tracker, \
 	oneElement* const element, std::list<IObserver*>::iterator iterator)
 {
-	//?????????
+	//捕获并写入人体骨架
 	k4a_wait_result_t queue_capture_result = \
 		k4abt_tracker_enqueue_capture(tracker, element->sensor_capture, K4A_WAIT_INFINITE);//????????
 	if (queue_capture_result == K4A_WAIT_RESULT_TIMEOUT)
@@ -282,7 +282,7 @@ int kinectSubject::onePicture(k4abt_tracker_t& tracker, \
 		k4a_wait_result_t pop_frame_result = \
 			k4abt_tracker_pop_result(tracker, &element->body_frame, K4A_WAIT_INFINITE);
 		element->timeStamp = k4abt_frame_get_device_timestamp_usec(element->body_frame);//?????
-		// ????????????
+		// 骨骼点数据清除和计算人数
 		uint32_t numBodies = k4abt_frame_get_num_bodies(element->body_frame);
 		if (pop_frame_result == K4A_WAIT_RESULT_SUCCEEDED)
 		{
@@ -294,14 +294,14 @@ int kinectSubject::onePicture(k4abt_tracker_t& tracker, \
 			if (get_body_skeleton == K4A_RESULT_SUCCEEDED)
 			{
 				cout << "have joints\n" << endl;
-				/***************???*******************/
-				JointsPositionToAngel(element->skeleton, &element->joints_Angel);//??????&,joints_Angel??????????????
+				/***************求角度*******************/
+				JointsPositionToAngel(element->skeleton, &element->joints_Angel);//必须传入地址&，joints_Angel虽然值相同但是数据类型有问题
 			}
 			else if (get_body_skeleton == K4A_RESULT_FAILED)
 			{
 				cout << "Get body skeleton failed!!\n" << endl;
 			}
-			//??kinect???ID
+			///获取kinect的人体ID
 			/*uint32_t id = k4abt_frame_get_body_id(element->body_frame, 1);*/
 			k4abt_frame_release(element->body_frame);
 		}

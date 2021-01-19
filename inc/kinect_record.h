@@ -16,6 +16,10 @@
         }while(0)
 
 #define KEY_DOWN(VK_NONAME) ((GetAsyncKeyState(VK_NONAME) & 0x8001) ? 1:0)//自对GetAsyncKeyState函数的上一次调用以来，如键已被按过，则位0设为1；否则设为0。如键目前处于按下状态，则位15设为1；如抬起，则为0。详见有道云
+//使用方法：
+//if (KEY_DOWN('S'){
+// 	//按下所对应代码
+// }
 
 //定义的报错显示程序
 //#define VERIFY(result, error)                                                                            \
