@@ -148,13 +148,22 @@ public:
 		cout << "Hi, I'm the pipElement \"" << PipeElements::static_number_++ << "\".\n";
 		//if(access(readFifo_.c_str(), F_OK) < 0) cout << "no readFifo_" << index_ << "exist" << endl;
 		int res;
-		//删除老的并建立写和读文件，python那边的open不会等待，这边会
+		//删除老的并建立写和读文件
 		remove(readFifo_.c_str());
+		remove(writeFifo_.c_str());
+		remove(mmapFifo_.c_str());
 		if( (res = mkfifo(readFifo_.c_str(), O_CREAT|O_EXCL|0755)) < 0)
 			ERR_EXIT("mkfifo err.");
-		remove(writeFifo_.c_str());
 		if( (res = mkfifo(writeFifo_.c_str(), O_CREAT|O_EXCL|0755)) < 0)
 			ERR_EXIT("mkfifo err.");
+		//读取共享内存的文件
+		fd_ = open(mmapFifo_.c_str(),O_RDWR|O_CREAT|O_TRUNC,0644);
+		if(fd_ < 0)
+		{
+			perror("open");
+			exit(2);
+		}
+		//python那边的open不会等待，这边会
 		if( (writeFd_ = open(writeFifo_.c_str(), O_WRONLY)) < 0){
 			unlink(writeFifo_.c_str());            //如果失败，删除
 			ERR_EXIT("open writeFifo_ err.");
@@ -163,14 +172,6 @@ public:
 			unlink(readFifo_.c_str());            //如果失败，删除
 			unlink(writeFifo_.c_str());            //如果失败，删除
 			ERR_EXIT("open readFifo_ err.");
-		}
-		remove(mmapFifo_.c_str());
-		//读取共享内存的文件
-		fd_ = open(mmapFifo_.c_str(),O_RDWR|O_CREAT|O_TRUNC,0644);
-		if(fd_ < 0)
-		{
-			perror("open");
-			exit(2);
 		}	
 	}
 

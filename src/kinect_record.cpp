@@ -36,15 +36,20 @@ int PipeElements::getAPicture(const Mat& picture, const string& elementName){
 	}
 int PipeElements::sendJson(){
 		ssize_t ret;
-		char recvbuff[15];
-		if( (ret = read(readFd_, recvbuff, 15)) < 0)
+		char recvbuff[512];
+		if( (ret = read(readFd_, recvbuff, 512)) < 0)
 			ERR_EXIT("read err.");
-		printf("%s\n", recvbuff);
-		const string s = base64_encode(j_.dump().c_str(), j_.dump().size());
-		const char * sendData = s.c_str();
-		cout << "the lengh of sendDate is" << strlen(sendData)+1 << endl;
-		cout << j_.dump() << endl;
-		write(writeFd_, sendData, strlen(sendData)+1);
+		cout << ret << endl;
+		//如果有接收端就发送
+		if(ret != 0)
+		{
+			printf("%s\n", recvbuff);
+			const string s = base64_encode(j_.dump().c_str(), j_.dump().size());
+			const char * sendData = s.c_str();
+			// cout << "the lengh of sendDate is" << strlen(sendData)+1 << endl;
+			// cout << j_.dump() << endl;
+			write(writeFd_, sendData, strlen(sendData)+1);
+		}
 		return 0;
 	}
 string PipeElements::stringToBase64_(const string& element){
@@ -226,7 +231,7 @@ void kinectSubject::cap(k4a_device_t& dev, const int i, const k4a_calibration_t&
 				cout << "colorframe imdecode erro" << endl;
 			}
 			onePicture(tracker, &element, iterator);
-			// imshow("Kinect color frame" + std::to_string(i), element.colorFrame);
+			// imshow("Kinect color frame" + std::to_string(i), *element.colorFrame);
 			// waitKey(1);//窗口的要等待时间，当显示图片时，窗口不用实时更新，所以imshow之前不加waitKey也是可以的，但若显示实时的视频，就必须加waitKey
 			k4a_capture_release(element.sensor_capture);
 		}
