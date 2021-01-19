@@ -165,12 +165,12 @@ public:
 		}
 		//python那边的open不会等待，这边会
 		if( (writeFd_ = open(writeFifo_.c_str(), O_WRONLY)) < 0){
-			unlink(writeFifo_.c_str());            //如果失败，删除
+			// unlink(writeFifo_.c_str());            //如果失败，删除
 			ERR_EXIT("open writeFifo_ err.");
 		}
 		if( (readFd_ = open(readFifo_.c_str(), O_RDONLY)) < 0){
-			unlink(readFifo_.c_str());            //如果失败，删除
-			unlink(writeFifo_.c_str());            //如果失败，删除
+			// unlink(readFifo_.c_str());            //如果失败，删除
+			// unlink(writeFifo_.c_str());            //如果失败，删除
 			ERR_EXIT("open readFifo_ err.");
 		}	
 	}
@@ -179,6 +179,13 @@ public:
 		RemoveMeFromTheList();
 		cout << "Goodbye, I was the pipeELement \"" << this->index_ << "\".\n";
 		unlink(writeFifo_.c_str()); 
+		unlink(readFifo_.c_str());
+		int ret = munmap(picture_,sizeof(numpySize_));
+		if(ret < 0)
+		{
+			perror("mmumap erro");
+			exit(4);
+		}
 	}
 
 	virtual void RemoveMeFromTheList() {
