@@ -231,8 +231,8 @@ void kinectSubject::cap(k4a_device_t& dev, const int i, const k4a_calibration_t&
 				cout << "colorframe imdecode erro" << endl;
 			}
 			onePicture(tracker, &element, iterator);
-			imshow("Kinect color frame" + std::to_string(i), *element.colorFrame);
-			waitKey(1);//窗口的要等待时间，当显示图片时，窗口不用实时更新，所以imshow之前不加waitKey也是可以的，但若显示实时的视频，就必须加waitKey
+			// imshow("Kinect color frame" + std::to_string(i), *element.colorFrame);
+			// waitKey(1);//窗口的要等待时间，当显示图片时，窗口不用实时更新，所以imshow之前不加waitKey也是可以的，但若显示实时的视频，就必须加waitKey
 			k4a_capture_release(element.sensor_capture);
 		}
 		else if (k4a_device_get_capture(dev, &element.sensor_capture, K4A_WAIT_INFINITE) == K4A_WAIT_RESULT_FAILED)
