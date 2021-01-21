@@ -39,9 +39,9 @@ int PipeElements::sendJson(){
 		char recvbuff[512];
 		if( (ret = read(readFd_, recvbuff, 512)) < 0)
 			ERR_EXIT("read err.");
-		//cout << ret << endl;
+		cout << "we have" << ret << endl;
 		//如果有接收端就发送
-		if(ret != 0)
+		if(ret != 0 && ret != -1)
 		{
 			//printf("%s\n", recvbuff);
 			const string s = base64_encode(j_.dump().c_str(), j_.dump().size());
@@ -231,8 +231,8 @@ void kinectSubject::cap(k4a_device_t& dev, const int i, const k4a_calibration_t&
 				cout << "colorframe imdecode erro" << endl;
 			}
 			onePicture(tracker, &element, iterator);
-			// imshow("Kinect color frame" + std::to_string(i), *element.colorFrame);
-			// waitKey(1);//窗口的要等待时间，当显示图片时，窗口不用实时更新，所以imshow之前不加waitKey也是可以的，但若显示实时的视频，就必须加waitKey
+			imshow("Kinect color frame" + std::to_string(i), *element.colorFrame);
+			waitKey(1);//窗口的要等待时间，当显示图片时，窗口不用实时更新，所以imshow之前不加waitKey也是可以的，但若显示实时的视频，就必须加waitKey
 			k4a_capture_release(element.sensor_capture);
 		}
 		else if (k4a_device_get_capture(dev, &element.sensor_capture, K4A_WAIT_INFINITE) == K4A_WAIT_RESULT_FAILED)
@@ -262,6 +262,10 @@ int kinectSubject::capThread()
 int kinectSubject::onePicture(k4abt_tracker_t& tracker, \
 	oneElement* const element, std::list<IObserver*>::iterator iterator)
 {
+	k4abt_skeleton_t skeleton;
+	uint numBodies;
+	uint noBodies = 0;
+	element->skeleton.clear();
 	//捕获并写入人体骨架
 	k4a_wait_result_t queue_capture_result = \
 		k4abt_tracker_enqueue_capture(tracker, element->sensor_capture, K4A_WAIT_INFINITE);//异步提取骨骼信息
@@ -269,11 +273,13 @@ int kinectSubject::onePicture(k4abt_tracker_t& tracker, \
 	{
 		// It should never hit timeout when K4A_WAIT_INFINITE is set.
 		cout << "Error! Add capture to tracker process queue timeout!\n" << endl;
+		element->numBodies = 0;
 		(*iterator)->OnlyShowMat(*element->colorFrame);
 	}
 	else if (queue_capture_result == K4A_WAIT_RESULT_FAILED)
 	{
 		cout << "Error! Add capture to tracker process queue failed!\n" << endl;
+		element->numBodies = 0;
 		(*iterator)->OnlyShowMat(*element->colorFrame);
 	}
 	else
@@ -283,37 +289,54 @@ int kinectSubject::onePicture(k4abt_tracker_t& tracker, \
 			k4abt_tracker_pop_result(tracker, &element->body_frame, K4A_WAIT_INFINITE);
 		element->timeStamp = k4abt_frame_get_device_timestamp_usec(element->body_frame);//获取时间戳
 		// 骨骼点数据清除和计算人数
-		uint32_t numBodies = k4abt_frame_get_num_bodies(element->body_frame);
+		numBodies = k4abt_frame_get_num_bodies(element->body_frame);
 		if (pop_frame_result == K4A_WAIT_RESULT_SUCCEEDED)
 		{
 			//Get the number of detecied human bodies
 			//size_t num_bodies = k4abt_frame_get_num_bodies(body_frame0);
-			k4a_result_t get_body_skeleton = \
-				k4abt_frame_get_body_skeleton(element->body_frame, 0, &element->skeleton);
+			for (int j = 0; j < numBodies ; ++j)
+			{
+				k4a_result_t get_body_skeleton = \
+					k4abt_frame_get_body_skeleton(element->body_frame, j, &skeleton);
+				
+				if (get_body_skeleton == K4A_RESULT_SUCCEEDED)
+				{
+					element->skeleton.push_back(skeleton); 
+					// k4a_image_t tmpImage = \
+					// k4abt_frame_get_body_index_map(element->body_frame);
+					// uint8_t* colorTextureBuffer = k4a_image_get_buffer(tmpImage);
+					// //cv::Mat tmp = cv::Mat(1, k4a_image_get_height_pixels(tmpImage) * k4a_image_get_width_pixels(tmpImage), CV_8UC1, colorTextureBuffer);
+					// cv::Mat tmp = cv::Mat(k4a_image_get_height_pixels(tmpImage),k4a_image_get_width_pixels(tmpImage),CV_8UC1,colorTextureBuffer);
+					// imshow("Kinect body index map", tmp);
+					// waitKey(1);//窗口的要等待时间，当显示图片时，窗口不用实时更新，所以imshow之前不加waitKey也是可以的，但若显示实时的视频，就必须加waitKey
 
-			if (get_body_skeleton == K4A_RESULT_SUCCEEDED)
-			{
-				//cout << "have joints\n" << endl;
-				/***************求角度*******************/
-				// JointsPositionToAngel(element->skeleton, &element->joints_Angel);//必须传入地址&，joints_Angel虽然值相同但是数据类型有问题
+					//cout << "have joints\n" << endl;
+					/***************求角度*******************/
+					// JointsPositionToAngel(element->skeleton, &element->joints_Angel);//必须传入地址&，joints_Angel虽然值相同但是数据类型有问题
+				}
+				else if (get_body_skeleton == K4A_RESULT_FAILED)
+				{
+					++noBodies;
+					// cout << "Get body skeleton failed!!\n" << endl;
+				}
+				///获取kinect的人体ID
+				/*uint32_t id = k4abt_frame_get_body_id(element->body_frame, 1);*/
 			}
-			else if (get_body_skeleton == K4A_RESULT_FAILED)
-			{
-				cout << "Get body skeleton failed!!\n" << endl;
-			}
-			///获取kinect的人体ID
-			/*uint32_t id = k4abt_frame_get_body_id(element->body_frame, 1);*/
+			element->numBodies = (int)(numBodies - noBodies);
+			//cout << element->numBodies << endl;
 			k4abt_frame_release(element->body_frame);
 		}
 		else if (pop_frame_result == K4A_WAIT_RESULT_TIMEOUT)
 		{
 			//  It should never hit timeout when K4A_WAIT_INFINITE is set.
 			cout << "Error! Pop body frame result timeout!\n" << endl;
+			element->numBodies = 0;
 			return 1;
 		}
 		else
 		{
 			cout << "Pop body frame result failed!\n" << endl;
+			element->numBodies = 0;
 			return 1;
 		}
 		(*iterator)->Update(element);

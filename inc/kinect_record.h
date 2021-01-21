@@ -96,7 +96,8 @@ struct oneElement {
 	k4abt_frame_t body_frame = NULL;
 	//float joints_Angel[ANGLE_NUM];
 	uint64_t timeStamp = NULL;
-	k4abt_skeleton_t skeleton;
+	int numBodies = 0;
+	vector<k4abt_skeleton_t> skeleton;
 };
 
 //通信接口
@@ -104,7 +105,7 @@ class socketOb{
 public:
 	virtual ~socketOb() {};
 	virtual int getAPicture(const Mat& picture, const string& elementName) = 0;
-	virtual int getString(const string& element, const string& elementName) = 0;
+	virtual int getString(const vector<string>& element, const string& elementName) = 0;
 	virtual int getVector(const vector<float>&element, const string& elementName) = 0;
 	virtual int sendJson() = 0;
 	virtual int findObserve(const bool& tmpFlag) = 0;//tmpFlag防止程序一直寻找
@@ -169,6 +170,7 @@ public:
 			exit(2);
 		}
 		//python那边的open不会等待，这边会
+		std::thread tids_ = thread(&PipeElements::forPipeAuto, this);
 		if( (writeFd_ = open(writeFifo_.c_str(), O_WRONLY)) < 0){
 			// unlink(writeFifo_.c_str());            //如果失败，删除
 			ERR_EXIT("open writeFifo_ err.");
@@ -177,7 +179,8 @@ public:
 			// unlink(readFifo_.c_str());            //如果失败，删除
 			// unlink(writeFifo_.c_str());            //如果失败，删除
 			ERR_EXIT("open readFifo_ err.");
-		}	
+		}
+		tids_.join();	
 	}
 
 	~PipeElements(){
@@ -205,7 +208,7 @@ public:
 		return 0;
 	}
 
-	int getString(const string& element, const string& elementName) override{
+	int getString(const vector<string>& element, const string& elementName) override{
 		j_[elementName] = element;
 		return 0;
 	}
@@ -238,10 +241,23 @@ private:
 	int numpySize_ = 0;
 	int writeFd_;
 	int readFd_;
+	//以下两个其实不需要作为全局
+	int forWriteFd_;
+	int forReadFd_;
 	const int index_;
 	json j_;
 	string stringToBase64_(const string& element);
 	string charToBase64_(const vector<uchar>& element);
+	void forPipeAuto(){
+		if( (forWriteFd_ = open(writeFifo_.c_str(), O_RDONLY)) < 0){
+			ERR_EXIT("open writeFifo_ err.");
+		}
+		if( (forReadFd_ = open(readFifo_.c_str(), O_WRONLY)) < 0){
+			ERR_EXIT("open readFifo_ err.");
+		}	
+		close(forWriteFd_);
+		close(forReadFd_);
+	}
 
 };
 
@@ -329,23 +345,46 @@ private:
 	std::list<socketOb*> list_pipe_;
 	oneElement* element_;
 	ISubject& subject_;
-	vector<float> fJoint_;
+	vector<vector<float>> fJoint_;//已经被架空，不被用于pipe，也许可用于保存
 
 	void PrintInfo() {
-		//清空
-		fJoint_.clear();
-		fJoint_.push_back(element_->timeStamp);
-		for (int i = 0; i < JOINT_NUM; i++)
-		{
-			fJoint_.push_back(element_->skeleton.joints[i].position.xyz.x);//传递的为向量的数组指针
-			fJoint_.push_back(element_->skeleton.joints[i].position.xyz.y);//传递的为向量的数组指针
-			fJoint_.push_back(element_->skeleton.joints[i].position.xyz.z);//传递的为向量的数组指针
-		}
+		// //清空
+		// fJoint_.clear();
+		// for(int j = 0; j < element_->numBodies ; ++j)
+		// {
+		// 	vector<float> tmpJoint;
+		// 	for (int i = 0; i < JOINT_NUM; ++i)
+		// 	{
+		// 		tmpJoint.push_back(element_->skeleton[j].joints[i].position.xyz.x);//传递的为向量的数组指针
+		// 		tmpJoint.push_back(element_->skeleton[j].joints[i].position.xyz.y);//传递的为向量的数组指针
+		// 		tmpJoint.push_back(element_->skeleton[j].joints[i].position.xyz.z);//传递的为向量的数组指针
+		// 	}
+		// 	fJoint_.push_back(tmpJoint);
+		// }
 		//发送json，之前请准备好数据
 		std::list<socketOb*>::iterator iterator = list_pipe_.begin();
 		//HowManyObserver();
 		while (iterator != list_pipe_.end()) {
-			(*iterator)->getVector(fJoint_,"joints");
+			//清空
+			fJoint_.clear();
+			vector<string> jointsName;
+			for(int j = 0; j < element_->numBodies ; ++j)
+			{
+				vector<float> tmpJoint;
+				for (int i = 0; i < JOINT_NUM; ++i)
+				{
+					tmpJoint.push_back(element_->skeleton[j].joints[i].position.xyz.x);//传递的为向量的数组指针
+					tmpJoint.push_back(element_->skeleton[j].joints[i].position.xyz.y);//传递的为向量的数组指针
+					tmpJoint.push_back(element_->skeleton[j].joints[i].position.xyz.z);//传递的为向量的数组指针
+				}
+				//cout << tmpJoint.size() << endl;
+				jointsName.push_back("joints"+to_string(j));
+				(*iterator)->getVector(tmpJoint,jointsName[j]);
+				//cout << tmpJoint[1] << endl;
+				fJoint_.push_back(tmpJoint);
+			}
+			// cout << jointsName[0] <<endl;
+			(*iterator)->getString(jointsName,"jointsName");
 			(*iterator)->getAPicture(*element_->colorFrame,"pictureInfo");
 			(*iterator)->sendJson();
 			++iterator;
