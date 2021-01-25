@@ -91,24 +91,25 @@ struct oneElement {
 	// 	//为了保存单独一个相机的关节角度建立的数组
 	// 	for (int i = 0; i < ANGLE_NUM; i++) this->joints_Angel[i] = NULL;
 	// };
-	cv::Mat* colorFrame;
-	k4a_capture_t sensor_capture = NULL;//捕获用变量
-	k4abt_frame_t body_frame = NULL;
 	//float joints_Angel[ANGLE_NUM];
-	uint64_t timeStamp = NULL;
-	int numBodies = 0;
+	cv:: Mat* colorFrame;
+	k4a_capture_t sensor_capture = NULL;  //捕获用变量
+	k4abt_frame_t body_frame     = NULL;
+	uint64_t      timeStamp      = NULL;
+	int           numBodies      = 0;
 	vector<k4abt_skeleton_t> skeleton;
+	vector<vector<k4a_float2_t>> points;
 };
 
 //通信接口
 class socketOb{
 public:
 	virtual ~socketOb() {};
-	virtual int getAPicture(const Mat& picture, const string& elementName) = 0;
+	virtual int getAPicture(const Mat& picture, const string& elementName)          = 0;
 	virtual int getString(const vector<string>& element, const string& elementName) = 0;
-	virtual int getVector(const vector<float>&element, const string& elementName) = 0;
-	virtual int sendJson() = 0;
-	virtual int findObserve(const bool& tmpFlag) = 0;//tmpFlag防止程序一直寻找
+	virtual int getFVector(const vector<float>&element, const string& elementName)  = 0;
+	virtual int sendJson()                                                          = 0;
+	virtual int findObserve(const bool& tmpFlag)                                    = 0;  //tmpFlag防止程序一直寻找
 };
 
 //相机观测者接口
@@ -116,10 +117,10 @@ class IObserver {
 public:
 	int number_;
 	virtual ~IObserver() {};
-	virtual void Update(oneElement* element) = 0;
+	virtual void Update(oneElement* element)      = 0;
 	virtual void OnlyShowMat(cv::Mat& colorFrame) = 0;
-	virtual void Attach(socketOb* pipeTarget) = 0;
-	virtual void Detach(socketOb* pipeTarget) = 0;
+	virtual void Attach(socketOb* pipeTarget)     = 0;
+	virtual void Detach(socketOb* pipeTarget)     = 0;
 };
 
 //主题接口
@@ -143,7 +144,7 @@ public:
 		return str;
 	};
 	//构造函数保证了写通道的建立
-	PipeElements(const string& writeFifo, const string& readFifo, const string& mmapFifo, IObserver& observerTarget):\
+	PipeElements(const string& writeFifo, const string& readFifo, const string& mmapFifo, IObserver& observerTarget): \
 	observer_(observerTarget),\
 	index_(PipeElements::static_number_),\
 	writeFifo_(writeFifo + to_string(PipeElements::static_number_)),\
@@ -151,7 +152,7 @@ public:
 	mmapFifo_(mmapFifo + intToString(PipeElements::static_number_)){
 		this->observer_.Attach(this);
 		//可见从0编号
-		cout << "Hi, I'm the pipElement \"" << PipeElements::static_number_++ << "\".\n";
+		cout << "Hi, I'm the pipElement \"" << PipeElements:: static_number_++ << "\".\n";
 		//if(access(readFifo_.c_str(), F_OK) < 0) cout << "no readFifo_" << index_ << "exist" << endl;
 		int res;
 		//删除老的并建立写和读文件
@@ -203,7 +204,7 @@ public:
 
 	int getAPicture(const Mat& picture, const string& elementName) override;
 
-	int getVector(const vector<float>& element, const string& elementName)override{
+	int getFVector(const vector<float>& element, const string& elementName)override{
 		j_[elementName] = element;
 		return 0;
 	}
@@ -264,7 +265,8 @@ private:
 //kinect主题
 class  kinectSubject : public ISubject {
 public:
-	uint32_t uintNum_, iMasterNum_ = 1;
+	uint32_t uintNum_    = 0;
+	uint32_t iMasterNum_ = 0;
 	//std::mutex* mtx_;
 
 	kinectSubject();
@@ -289,17 +291,18 @@ private:
 	std::list<IObserver*> list_observer_;
 
 	k4a_calibration_t* sensorCalibration_ = nullptr;
-	k4a_device_t* dev_ = nullptr;
-	std::thread* tids_ = nullptr;
-	bool bInitFlag_ = false, bDel_ = false;
-	cv::Mat* piture_ = nullptr;
+	k4a_device_t*      dev_               = nullptr;
+	thread*            tids_              = nullptr;
+	bool               bInitFlag_         = false;
+	bool               bDel_              = false;
+	Mat*               piture_            = nullptr;
 
 	int init();
 	int reKinct();
 	int del();
 	void cap(k4a_device_t& dev, const int i, const k4a_calibration_t& sensorCalibration);  //普通的函数，用来执行线程
 	int onePicture(k4abt_tracker_t& tracker, \
-	oneElement* const element, std::list<IObserver*>::iterator iterator);
+	oneElement* const element, std::list<IObserver*>::iterator iterator, const k4a_calibration_t* sensorCalibration);
 };
 
 class  Observer : public IObserver {
@@ -348,19 +351,6 @@ private:
 	vector<vector<float>> fJoint_;//已经被架空，不被用于pipe，也许可用于保存
 
 	void PrintInfo() {
-		// //清空
-		// fJoint_.clear();
-		// for(int j = 0; j < element_->numBodies ; ++j)
-		// {
-		// 	vector<float> tmpJoint;
-		// 	for (int i = 0; i < JOINT_NUM; ++i)
-		// 	{
-		// 		tmpJoint.push_back(element_->skeleton[j].joints[i].position.xyz.x);//传递的为向量的数组指针
-		// 		tmpJoint.push_back(element_->skeleton[j].joints[i].position.xyz.y);//传递的为向量的数组指针
-		// 		tmpJoint.push_back(element_->skeleton[j].joints[i].position.xyz.z);//传递的为向量的数组指针
-		// 	}
-		// 	fJoint_.push_back(tmpJoint);
-		// }
 		//发送json，之前请准备好数据
 		std::list<socketOb*>::iterator iterator = list_pipe_.begin();
 		//HowManyObserver();
@@ -368,22 +358,29 @@ private:
 			//清空
 			fJoint_.clear();
 			vector<string> jointsName;
+			vector<string> pointsName;
 			for(int j = 0; j < element_->numBodies ; ++j)
 			{
 				vector<float> tmpJoint;
+				vector<float> tmpPoint;
 				for (int i = 0; i < JOINT_NUM; ++i)
 				{
 					tmpJoint.push_back(element_->skeleton[j].joints[i].position.xyz.x);//传递的为向量的数组指针
 					tmpJoint.push_back(element_->skeleton[j].joints[i].position.xyz.y);//传递的为向量的数组指针
 					tmpJoint.push_back(element_->skeleton[j].joints[i].position.xyz.z);//传递的为向量的数组指针
+					tmpPoint.push_back(element_->points[j][i].xy.x);
+					tmpPoint.push_back(element_->points[j][i].xy.y);
 				}
 				//cout << tmpJoint.size() << endl;
 				jointsName.push_back("joints"+to_string(j));
-				(*iterator)->getVector(tmpJoint,jointsName[j]);
+				pointsName.push_back("points"+to_string(j));
+				(*iterator)->getFVector(tmpJoint,jointsName[j]);
+				(*iterator)->getFVector(tmpPoint,pointsName[j]);
 				//cout << tmpJoint[1] << endl;
 				fJoint_.push_back(tmpJoint);
 			}
 			// cout << jointsName[0] <<endl;
+			(*iterator)->getString(pointsName,"pointsName");
 			(*iterator)->getString(jointsName,"jointsName");
 			(*iterator)->getAPicture(*element_->colorFrame,"pictureInfo");
 			(*iterator)->sendJson();

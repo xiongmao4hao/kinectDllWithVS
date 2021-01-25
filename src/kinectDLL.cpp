@@ -5,11 +5,11 @@
 using namespace cv;
 using namespace std;
 
-int Observer::static_number_ = 0;
+int Observer::static_number_     = 0;
 int PipeElements::static_number_ = 0;
 
-std::list<IObserver*> list_observer;
-std::list<PipeElements*> list_pipeElements;
+std:: list<IObserver*> list_observer;
+std:: list<PipeElements*> list_pipeElements;
 
 template <typename T> T* getIteratorin(std::list<T*> list,int i){
 	typename list<T*>::iterator iterator = list.begin();
@@ -47,8 +47,9 @@ uint getObserver(kinectSubject* kinect) {
 int removeObserver(int i){
 	Observer* observeTarget = (Observer*)getIteratorin<IObserver>(list_observer,i);
 	list_observer.remove(observeTarget);//未验证的remove函数
-	observeTarget->RemoveMeFromTheList();
-	--Observer::static_number_;
+	//observeTarget->RemoveMeFromTheList();
+	--Observer:: static_number_;
+	delete observeTarget;
 	return 0;
 }
 
@@ -62,8 +63,9 @@ uint getPipeElements(int i) {
 int removePipeElements(int i){
 	PipeElements* pipeTarget = (PipeElements*)getIteratorin<PipeElements>(list_pipeElements,i);
 	list_pipeElements.remove(pipeTarget);//未验证的remove函数
-	pipeTarget->RemoveMeFromTheList();
-	--PipeElements::static_number_; 
+	//pipeTarget->RemoveMeFromTheList();
+	--PipeElements:: static_number_;
+	delete pipeTarget;
 	return 0;
 }
 
