@@ -268,7 +268,9 @@ int kinectSubject::onePicture(k4abt_tracker_t& tracker, \
 	k4abt_skeleton_t skeleton;
 	uint numBodies;
 	uint noBodies = 0;
+	element->numBodies = 0;
 	element->skeleton.clear();
+	element->points.clear();
 	//捕获并写入人体骨架
 	k4a_wait_result_t queue_capture_result = \
 		k4abt_tracker_enqueue_capture(tracker, element->sensor_capture, K4A_WAIT_INFINITE);//异步提取骨骼信息
@@ -311,18 +313,19 @@ int kinectSubject::onePicture(k4abt_tracker_t& tracker, \
 					vector<k4a_float2_t> tmpPoints;
 					for(int a = 0; a < JOINT_NUM; ++a)
 					{
-						// k4a_float3_t tmpK4aFloat3;
+						k4a_float3_t tmpK4aFloat3;
 						k4a_float2_t tmpK4aFloat2;
 						int tmpI;
 						// cout << skeleton.joints[a].position.xyz.x << endl;
 						// cout << k4a_calibration_3d_to_3d(&(sensorCalibration_[i]), &(skeleton.joints[a].position),\
 						//  K4A_CALIBRATION_TYPE_DEPTH, K4A_CALIBRATION_TYPE_COLOR, tmpK4aFloat3) << endl;
-						// VERIFY(k4a_calibration_3d_to_3d(sensorCalibration, &skeleton.joints[a].position,\
-						//   K4A_CALIBRATION_TYPE_DEPTH, K4A_CALIBRATION_TYPE_COLOR, &tmpK4aFloat3),"calibration_3d_to_3d failed");
+						VERIFY(k4a_calibration_3d_to_3d(sensorCalibration, &skeleton.joints[a].position,\
+						  K4A_CALIBRATION_TYPE_DEPTH, K4A_CALIBRATION_TYPE_COLOR, &tmpK4aFloat3),"calibration_3d_to_3d failed");
 						VERIFY(k4a_calibration_3d_to_2d(sensorCalibration, &skeleton.joints[a].position,\
 						 K4A_CALIBRATION_TYPE_DEPTH, K4A_CALIBRATION_TYPE_COLOR, &tmpK4aFloat2, &tmpI),"calibration_3d_to_2d failed");
 						// cout << *tmpI << endl;
-						tmpPoints.push_back(tmpK4aFloat2);						
+						tmpPoints.push_back(tmpK4aFloat2);
+						skeleton.joints[a].position = tmpK4aFloat3;						
 					}
 					element->points.push_back(tmpPoints);
 					element->skeleton.push_back(skeleton); 

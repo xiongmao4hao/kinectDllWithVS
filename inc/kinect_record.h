@@ -374,6 +374,7 @@ private:
 				//cout << tmpJoint.size() << endl;
 				jointsName.push_back("joints"+to_string(j));
 				pointsName.push_back("points"+to_string(j));
+				// cout << tmpPoint[0] << endl;
 				(*iterator)->getFVector(tmpJoint,jointsName[j]);
 				(*iterator)->getFVector(tmpPoint,pointsName[j]);
 				//cout << tmpJoint[1] << endl;
