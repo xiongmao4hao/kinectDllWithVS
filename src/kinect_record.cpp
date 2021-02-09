@@ -269,6 +269,8 @@ int kinectSubject::onePicture(k4abt_tracker_t& tracker, \
 	uint numBodies;
 	uint noBodies = 0;
 	element->numBodies = 0;
+	//清空vector
+	element->IDArray.clear();
 	element->skeleton.clear();
 	element->points.clear();
 	//捕获并写入人体骨架
@@ -347,7 +349,9 @@ int kinectSubject::onePicture(k4abt_tracker_t& tracker, \
 					cout << "Get body skeleton failed!!\n" << endl;
 				}
 				///获取kinect的人体ID
-				/*uint32_t id = k4abt_frame_get_body_id(element->body_frame, 1);*/
+				uint32_t id = k4abt_frame_get_body_id(element->body_frame,j);
+				element->IDArray.push_back(id);
+				// cout << id << endl;
 			}
 			element->numBodies = (int)(numBodies - noBodies);
 			//cout << element->numBodies << endl;

@@ -96,7 +96,8 @@ struct oneElement {
 	k4a_capture_t sensor_capture = NULL;  //捕获用变量
 	k4abt_frame_t body_frame     = NULL;
 	uint64_t      timeStamp      = NULL;
-	int           numBodies      = 0;
+	uint32_t           numBodies      = 0;
+	vector<int> IDArray;
 	vector<k4abt_skeleton_t> skeleton;
 	vector<vector<k4a_float2_t>> points;
 };
@@ -108,6 +109,7 @@ public:
 	virtual int getAPicture(const Mat& picture, const string& elementName)          = 0;
 	virtual int getString(const vector<string>& element, const string& elementName) = 0;
 	virtual int getFVector(const vector<float>&element, const string& elementName)  = 0;
+	virtual int getUint32(const uint32_t , const string& elementName)               = 0;
 	virtual int sendJson()                                                          = 0;
 	virtual int findObserve(const bool& tmpFlag)                                    = 0;  //tmpFlag防止程序一直寻找
 };
@@ -205,6 +207,11 @@ public:
 	int getAPicture(const Mat& picture, const string& elementName) override;
 
 	int getFVector(const vector<float>& element, const string& elementName)override{
+		j_[elementName] = element;
+		return 0;
+	}
+
+	int getUint32(const uint32_t element , const string& elementName)override{
 		j_[elementName] = element;
 		return 0;
 	}
@@ -359,10 +366,13 @@ private:
 			fJoint_.clear();
 			vector<string> jointsName;
 			vector<string> pointsName;
+			vector<string> IDName;
 			for(int j = 0; j < element_->numBodies ; ++j)
 			{
 				vector<float> tmpJoint;
 				vector<float> tmpPoint;
+				// vector<float> tmpID;
+				// uint32_t ID = element_->IDArray[j];
 				for (int i = 0; i < JOINT_NUM; ++i)
 				{
 					tmpJoint.push_back(element_->skeleton[j].joints[i].position.xyz.x);//传递的为向量的数组指针
@@ -374,15 +384,18 @@ private:
 				//cout << tmpJoint.size() << endl;
 				jointsName.push_back("joints"+to_string(j));
 				pointsName.push_back("points"+to_string(j));
+				IDName.push_back("ID"+to_string(j));
 				// cout << tmpPoint[0] << endl;
 				(*iterator)->getFVector(tmpJoint,jointsName[j]);
 				(*iterator)->getFVector(tmpPoint,pointsName[j]);
+				(*iterator)->getUint32(element_->IDArray[j],IDName[j]);
 				//cout << tmpJoint[1] << endl;
 				fJoint_.push_back(tmpJoint);
 			}
 			// cout << jointsName[0] <<endl;
 			(*iterator)->getString(pointsName,"pointsName");
 			(*iterator)->getString(jointsName,"jointsName");
+			(*iterator)->getString(IDName,"IDName");
 			(*iterator)->getAPicture(*element_->colorFrame,"pictureInfo");
 			(*iterator)->sendJson();
 			++iterator;
