@@ -152,6 +152,75 @@ int kinectSubject:: init()
 	return 0;
 }
 
+
+int kinectSubject:: initPlayback()
+{
+	//根据目录下的文件新建
+	string dir;
+	cout << "Please choose the PATH" << endl;
+	cin >> dir;
+	vector<string> files=getFiles(dir); 
+	uintNum_ = k4a::device::get_installed_count();
+	cout << uintNum_ << endl;
+	if (uintNum_ == 0)
+	{
+		cout << "no azure kinect dk devices detected!" << endl;
+		return 1;
+	}
+	//初始化为NULL但是会造成程序在k4a_record_close时报错，于是在后续的if中解决了此问题
+	dev_    = new k4a_device_t[uintNum_];
+	piture_ = new cv::Mat[uintNum_];
+	//mtx_ = new mutex[uintNum_];
+	k4a_device_configuration_t* config             = new k4a_device_configuration_t[uintNum_];
+	                            sensorCalibration_ = new k4a_calibration_t[uintNum_];
+
+	for (uint8_t deviceIndex = 0; deviceIndex < uintNum_; deviceIndex++)
+	{
+		if (K4A_RESULT_SUCCEEDED != k4a_device_open(deviceIndex, &dev_[deviceIndex]))
+		{
+			printf("%d: Failed to open device\n", deviceIndex);
+			return 1;
+		}
+		config[deviceIndex]                          = K4A_DEVICE_CONFIG_INIT_DISABLE_ALL;
+		config[deviceIndex].camera_fps               = K4A_FRAMES_PER_SECOND_30;
+		config[deviceIndex].depth_mode               = K4A_DEPTH_MODE_NFOV_UNBINNED;
+		config[deviceIndex].color_format             = K4A_IMAGE_FORMAT_COLOR_MJPG;
+		config[deviceIndex].color_resolution         = K4A_COLOR_RESOLUTION_720P;
+		config[deviceIndex].synchronized_images_only = true;
+		bool sync_in, sync_out;
+		VERIFY(k4a_device_get_sync_jack(dev_[deviceIndex], &sync_in, &sync_out), "get sync jack failed");
+		if (sync_in == true)
+		{
+			cout << "subordinate device detected!" << endl;
+			config[deviceIndex].wired_sync_mode = K4A_WIRED_SYNC_MODE_SUBORDINATE;
+		}
+		else if (sync_out == true)
+		{
+			cout << "master device detected!" << endl;
+			                                                               iMasterNum_                  = (int)deviceIndex;
+			                                                        config[deviceIndex].wired_sync_mode = K4A_WIRED_SYNC_MODE_MASTER;
+		}
+		else
+		{
+			cout << "standalone device detected!" << endl;
+			                                                               iMasterNum_                  = 0;
+			                                                        config[deviceIndex].wired_sync_mode = K4A_WIRED_SYNC_MODE_STANDALONE;
+		}
+
+		cout << "started opening k4a device..." << endl;
+		VERIFY(k4a_device_start_cameras(dev_[deviceIndex], &config[deviceIndex]), "Start K4A cameras failed!");//启动
+		//校准设备
+		VERIFY(k4a_device_get_calibration(dev_[deviceIndex], config[deviceIndex].depth_mode, config[deviceIndex].color_resolution, &sensorCalibration_[deviceIndex]),
+			"Get depth camera calibration failed!")
+		VERIFY(k4a_device_set_color_control(dev_[deviceIndex], K4A_COLOR_CONTROL_BRIGHTNESS, K4A_COLOR_CONTROL_MODE_MANUAL, 150), "color brightness control failed");//手动设置曝光
+		cout << "finished opening k4a device!\n" << endl;
+	}
+
+	//初始化成功标志
+	bInitFlag_ = true;
+	return 0;
+}
+
 int kinectSubject:: del()
 {
 	// cout << "bInitFlag_" << bInitFlag_ << endl;
@@ -188,6 +257,70 @@ int kinectSubject:: reKinct()
 }
 
 void kinectSubject:: cap(k4a_device_t& dev, const int i, const k4a_calibration_t& sensorCalibration)  //普通的函数，用来执行线程
+{
+	k4a_image_t colorImage;
+	uint8_t* colorTextureBuffer;
+	oneElement element;
+
+	//注意要在外部调用库时依据kinect数目创建
+	std::list<IObserver*>::iterator iterator = list_observer_.begin();
+	if (uintNum_ != list_observer_.size())
+	{
+		printf("no matching observe：\n");
+		HowManyObserver();
+		cout << "while " << i << "kinect" << endl;
+		exit(1);
+	}
+	else {
+		for (int j = i; j > 0; --j) {
+			++iterator;
+		}
+	}
+	//关节点追踪变量tracker的建立
+	k4abt_tracker_t               tracker        = NULL;
+	k4abt_tracker_configuration_t tracker_config = K4ABT_TRACKER_CONFIG_DEFAULT;
+	VERIFY(k4abt_tracker_create(&sensorCalibration, tracker_config, &tracker), "Body tracker initialization failed!");
+	cv:: Mat tmp;
+	while (1)
+	{
+		if (k4a_device_get_capture(dev, &element.sensor_capture, K4A_WAIT_INFINITE) == K4A_WAIT_RESULT_SUCCEEDED)
+		{
+			colorImage         = k4a_capture_get_color_image(element.sensor_capture);  //从捕获中获取图像
+			colorTextureBuffer = k4a_image_get_buffer(colorImage);
+			//depthFrame = cv::Mat(depthImage.get_height_pixels(), depthImage.get_width_pixels(), CV_8UC4, depthTextureBuffer.data());
+			tmp = cv::Mat(1, k4a_image_get_height_pixels(colorImage) * k4a_image_get_width_pixels(colorImage), CV_8UC1, colorTextureBuffer);
+			tmp = imdecode(tmp, IMREAD_COLOR);
+			k4a_image_release(colorImage);
+			cvtColor(tmp, tmp, COLOR_BGRA2BGR);//RGBA转RGB
+			// double scale = 0.5;
+			// Size dsize = Size(tmp.cols*scale,tmp.rows*scale);
+			// Mat picture2 = Mat(dsize,CV_32S);
+			// resize(tmp,picture2,dsize);		
+			element.colorFrame = &tmp;  //&picture2;//piture_[i];
+			
+			if (element.colorFrame->data == NULL)
+			{
+				cout << "colorframe imdecode erro" << endl;
+			}
+			onePicture(tracker, &element, iterator, &sensorCalibration);
+			// imshow("Kinect color frame" + std::to_string(i), *element.colorFrame);
+			// waitKey(1);//窗口的要等待时间，当显示图片时，窗口不用实时更新，所以imshow之前不加waitKey也是可以的，但若显示实时的视频，就必须加waitKey
+			k4a_capture_release(element.sensor_capture);
+		}
+		else if (k4a_device_get_capture(dev, &element.sensor_capture, K4A_WAIT_INFINITE) == K4A_WAIT_RESULT_FAILED)
+			VERIFY(k4a_device_get_capture(dev, &element.sensor_capture, 10), "Capture failed");
+		if (bDel_)
+		{
+			k4a_device_stop_cameras(dev);//停止流
+			k4abt_tracker_shutdown(tracker);//关闭捕捉
+			k4abt_tracker_destroy(tracker);
+			k4a_device_close(dev);
+			break;
+		}
+	}
+}
+
+void kinectSubject:: playback(k4a_device_t& dev, const int i, const k4a_calibration_t& sensorCalibration)  //普通的函数，用来执行线程
 {
 	k4a_image_t colorImage;
 	uint8_t* colorTextureBuffer;
