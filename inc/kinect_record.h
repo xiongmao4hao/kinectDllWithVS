@@ -54,6 +54,7 @@
 #include <k4a/k4a.hpp>
 #include "kinect_cv_dk.h"
 #include "kinect_angle.h"
+#include "get_roecord_config.h"
 #include <thread>
 #include "getFiles.hpp"
 
@@ -301,6 +302,7 @@ private:
 
 	k4a_calibration_t* sensorCalibration_ = nullptr;
 	k4a_device_t*      dev_               = nullptr;
+	k4a_playback_t*    playback_          = nullptr;
 	thread*            tids_              = nullptr;
 	bool               bInitFlag_         = false;
 	bool               bDel_              = false;

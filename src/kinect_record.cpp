@@ -160,62 +160,40 @@ int kinectSubject:: initPlayback()
 	cout << "Please choose the PATH" << endl;
 	cin >> dir;
 	vector<string> files=getFiles(dir); 
-	uintNum_ = k4a::device::get_installed_count();
+	std::list<socketOb*>::iterator iterator = files.begin();
+	for(int j = 0; j < files.size() ; ++j){
+		if(string::npos != files[j].find(".mkv")){
+			files.erase(iterator);
+			continue;
+		}
+	}
+	uintNum_ = files.size();
 	cout << uintNum_ << endl;
 	if (uintNum_ == 0)
 	{
-		cout << "no azure kinect dk devices detected!" << endl;
+		cout << "no azure kinect playback detected!" << endl;
 		return 1;
 	}
 	//初始化为NULL但是会造成程序在k4a_record_close时报错，于是在后续的if中解决了此问题
-	dev_    = new k4a_device_t[uintNum_];
-	piture_ = new cv::Mat[uintNum_];
-	//mtx_ = new mutex[uintNum_];
+	                            playback_          = new k4a_playback_t[uintNum_];
+	                            piture_            = new cv::Mat[uintNum_];
 	k4a_device_configuration_t* config             = new k4a_device_configuration_t[uintNum_];
 	                            sensorCalibration_ = new k4a_calibration_t[uintNum_];
 
 	for (uint8_t deviceIndex = 0; deviceIndex < uintNum_; deviceIndex++)
 	{
-		if (K4A_RESULT_SUCCEEDED != k4a_device_open(deviceIndex, &dev_[deviceIndex]))
+		if (K4A_RESULT_SUCCEEDED != k4a_playback_open(files,&playback_[deviceIndex]))
 		{
 			printf("%d: Failed to open device\n", deviceIndex);
 			return 1;
 		}
-		config[deviceIndex]                          = K4A_DEVICE_CONFIG_INIT_DISABLE_ALL;
-		config[deviceIndex].camera_fps               = K4A_FRAMES_PER_SECOND_30;
-		config[deviceIndex].depth_mode               = K4A_DEPTH_MODE_NFOV_UNBINNED;
-		config[deviceIndex].color_format             = K4A_IMAGE_FORMAT_COLOR_MJPG;
-		config[deviceIndex].color_resolution         = K4A_COLOR_RESOLUTION_720P;
-		config[deviceIndex].synchronized_images_only = true;
-		bool sync_in, sync_out;
-		VERIFY(k4a_device_get_sync_jack(dev_[deviceIndex], &sync_in, &sync_out), "get sync jack failed");
-		if (sync_in == true)
-		{
-			cout << "subordinate device detected!" << endl;
-			config[deviceIndex].wired_sync_mode = K4A_WIRED_SYNC_MODE_SUBORDINATE;
-		}
-		else if (sync_out == true)
-		{
-			cout << "master device detected!" << endl;
-			                                                               iMasterNum_                  = (int)deviceIndex;
-			                                                        config[deviceIndex].wired_sync_mode = K4A_WIRED_SYNC_MODE_MASTER;
-		}
-		else
-		{
-			cout << "standalone device detected!" << endl;
-			                                                               iMasterNum_                  = 0;
-			                                                        config[deviceIndex].wired_sync_mode = K4A_WIRED_SYNC_MODE_STANDALONE;
-		}
-
-		cout << "started opening k4a device..." << endl;
-		VERIFY(k4a_device_start_cameras(dev_[deviceIndex], &config[deviceIndex]), "Start K4A cameras failed!");//启动
-		//校准设备
-		VERIFY(k4a_device_get_calibration(dev_[deviceIndex], config[deviceIndex].depth_mode, config[deviceIndex].color_resolution, &sensorCalibration_[deviceIndex]),
-			"Get depth camera calibration failed!")
-		VERIFY(k4a_device_set_color_control(dev_[deviceIndex], K4A_COLOR_CONTROL_BRIGHTNESS, K4A_COLOR_CONTROL_MODE_MANUAL, 150), "color brightness control failed");//手动设置曝光
-		cout << "finished opening k4a device!\n" << endl;
+		VERIFY(k4a_playback_get_record_configuration(playback_[deviceIndex],config[deviceIndex]));
+		//此为自己的函数,仅仅用作展示深度相机模式
+		get_record_configint(config[deviceIndex]);
+		VERIFY(k4a_playback_get_calibration(playback_[deviceIndex], &sensorCalibration_[deviceIndex]),
+		"Get depth camera calibration failed!")
+		cout << "finished opening "<< files[deviceIndex] << "!\n" << endl;
 	}
-
 	//初始化成功标志
 	bInitFlag_ = true;
 	return 0;
