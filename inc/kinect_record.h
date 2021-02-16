@@ -307,13 +307,15 @@ private:
 	bool               bInitFlag_         = false;
 	bool               bDel_              = false;
 	Mat*               piture_            = nullptr;
+	FILE*              fp_                = nullptr;
+	FILE*              fj_                = nullptr;
 
 	int init();
 	int initPlayback();
 	int reKinct();
 	int del();
 	void cap(k4a_device_t& dev, const int i, const k4a_calibration_t& sensorCalibration);  //普通的函数，用来执行线程
-	void playback(k4a_device_t& dev, const int i, const k4a_calibration_t& sensorCalibration);  //普通的函数，用来执行线程
+	void playback(k4a_playback_t& playback, const int i, const k4a_calibration_t& sensorCalibration，const FILE fp, const FILE fj);  //普通的函数，用来执行线程
 	int onePicture(k4abt_tracker_t& tracker, \
 	oneElement* const element, std::list<IObserver*>::iterator iterator, const k4a_calibration_t* sensorCalibration);
 };

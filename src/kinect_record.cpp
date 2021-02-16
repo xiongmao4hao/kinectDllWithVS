@@ -128,14 +128,14 @@ int kinectSubject:: init()
 		else if (sync_out == true)
 		{
 			cout << "master device detected!" << endl;
-			                                                               iMasterNum_                  = (int)deviceIndex;
-			                                                        config[deviceIndex].wired_sync_mode = K4A_WIRED_SYNC_MODE_MASTER;
+			       iMasterNum_                  = (int)deviceIndex;
+			config[deviceIndex].wired_sync_mode = K4A_WIRED_SYNC_MODE_MASTER;
 		}
 		else
 		{
 			cout << "standalone device detected!" << endl;
-			                                                               iMasterNum_                  = 0;
-			                                                        config[deviceIndex].wired_sync_mode = K4A_WIRED_SYNC_MODE_STANDALONE;
+			       iMasterNum_                  = 0;
+			config[deviceIndex].wired_sync_mode = K4A_WIRED_SYNC_MODE_STANDALONE;
 		}
 
 		cout << "started opening k4a device..." << endl;
@@ -162,9 +162,15 @@ int kinectSubject:: initPlayback()
 	vector<string> files=getFiles(dir); 
 	std::list<socketOb*>::iterator iterator = files.begin();
 	for(int j = 0; j < files.size() ; ++j){
-		if(string::npos != files[j].find(".mkv")){
+		int mkvIndex = *iterator.rfind(".mkv");
+		if(string::npos == mkvIndex){
 			files.erase(iterator);
 			continue;
+		}
+		else{
+			//TODO:s1.replace(1, 3, "123456", 2, 4);  //用 "123456" 的子串(2,4) 替换 s1 的子串(1,3)
+			*iterator.replace(mkvIndex, *iterator.length(), ".")
+			++iterator;
 		}
 	}
 	uintNum_ = files.size();
@@ -175,21 +181,39 @@ int kinectSubject:: initPlayback()
 		return 1;
 	}
 	//初始化为NULL但是会造成程序在k4a_record_close时报错，于是在后续的if中解决了此问题
-	                            playback_          = new k4a_playback_t[uintNum_];
-	                            piture_            = new cv::Mat[uintNum_];
+								playback_          = new k4a_playback_t[uintNum_];
+								fp_                = new FILE[uintNum_];
+								fj_                = new FILE[uintNum_];
+								piture_            = new cv::Mat[uintNum_];
 	k4a_device_configuration_t* config             = new k4a_device_configuration_t[uintNum_];
-	                            sensorCalibration_ = new k4a_calibration_t[uintNum_];
+								sensorCalibration_ = new k4a_calibration_t[uintNum_];
 
 	for (uint8_t deviceIndex = 0; deviceIndex < uintNum_; deviceIndex++)
 	{
-		if (K4A_RESULT_SUCCEEDED != k4a_playback_open(files,&playback_[deviceIndex]))
+		if (K4A_RESULT_SUCCEEDED != k4a_playback_open(files+".mkv",&playback_[deviceIndex]))
 		{
 			printf("%d: Failed to open device\n", deviceIndex);
 			return 1;
 		}
+		fp_[deviceIndex] = fopen((files+"fp.csv").c_str(), "w")
+		fj_[deviceIndex] = fopen((files+"fj.csv").c_str(), "w")
 		VERIFY(k4a_playback_get_record_configuration(playback_[deviceIndex],config[deviceIndex]));
 		//此为自己的函数,仅仅用作展示深度相机模式
 		get_record_configint(config[deviceIndex]);
+		switch(config[deviceIndex].wired_sync_mode)
+		{
+			case K4A_WIRED_SYNC_MODE_MASTER:{
+				iMasterNum_  = (int)deviceIndex;
+				break;
+			}
+			case K4A_WIRED_SYNC_MODE_STANDALONE:{
+				iMasterNum_ = 0;
+				break;
+			}
+			default:{
+				break;
+			}		
+		}
 		VERIFY(k4a_playback_get_calibration(playback_[deviceIndex], &sensorCalibration_[deviceIndex]),
 		"Get depth camera calibration failed!")
 		cout << "finished opening "<< files[deviceIndex] << "!\n" << endl;
@@ -298,7 +322,7 @@ void kinectSubject:: cap(k4a_device_t& dev, const int i, const k4a_calibration_t
 	}
 }
 
-void kinectSubject:: playback(k4a_device_t& dev, const int i, const k4a_calibration_t& sensorCalibration)  //普通的函数，用来执行线程
+void kinectSubject:: playback(k4a_playback_t& playback, const int i, const k4a_calibration_t& sensorCalibration，const FILE fp, const FILE fj)  //普通的函数，用来执行线程
 {
 	k4a_image_t colorImage;
 	uint8_t* colorTextureBuffer;
@@ -325,8 +349,10 @@ void kinectSubject:: playback(k4a_device_t& dev, const int i, const k4a_calibrat
 	cv:: Mat tmp;
 	while (1)
 	{
-		if (k4a_device_get_capture(dev, &element.sensor_capture, K4A_WAIT_INFINITE) == K4A_WAIT_RESULT_SUCCEEDED)
+		k4a_stream_result_t captureResult = k4a_playback_get_next_capture(playback, &element.sensor_capture);
+		switch (captureResult)
 		{
+		case K4A_WAIT_RESULT_SUCCEEDED:
 			colorImage         = k4a_capture_get_color_image(element.sensor_capture);  //从捕获中获取图像
 			colorTextureBuffer = k4a_image_get_buffer(colorImage);
 			//depthFrame = cv::Mat(depthImage.get_height_pixels(), depthImage.get_width_pixels(), CV_8UC4, depthTextureBuffer.data());
@@ -348,21 +374,60 @@ void kinectSubject:: playback(k4a_device_t& dev, const int i, const k4a_calibrat
 			// imshow("Kinect color frame" + std::to_string(i), *element.colorFrame);
 			// waitKey(1);//窗口的要等待时间，当显示图片时，窗口不用实时更新，所以imshow之前不加waitKey也是可以的，但若显示实时的视频，就必须加waitKey
 			k4a_capture_release(element.sensor_capture);
+			//生成csv
+			fprintf(fp, "%llu,", element.timeStamp);
+			fprintf(fp, "%llu,", element.numBodies);
+			fprintf(fj, "%llu,", element.timeStamp);
+			fprintf(fj, "%llu,", element.numBodies);
+			for(int j = 0; j < element.numBodies ; ++j){
+				for (int i = 0; i < JOINT_NUM; ++i){
+					fprintf(fp, "%f,%f,", element.points[j][i].xy.x, element.points[j][i].xy.y);
+					fprintf(fj, "%f,%f,%f,", element.skeleton[j].joints[i].position.xyz.x, \
+					element.skeleton[j].joints[i].position.xyz.y, element.skeleton[j].joints[i].position.xyz.z);
+				}
+				fprintf(fp,"%llu,", element.IDArray[j]);
+				fprintf(fj,"%llu,", element.IDArray[j]);
+			}
+			fprintf(fp,"\n");
+		  	fprintf(fj,"\n");
+			break;
+		case K4A_WAIT_RESULT_TIMEOUT:
+			cout << "Record finished! Please check the txt files under the path you set!\n" << endl;
+			goto finish;
+		default:
+			cout << "Get depth capture returned error:" << captureResult << endl;
+			goto finish;
 		}
-		else if (k4a_device_get_capture(dev, &element.sensor_capture, K4A_WAIT_INFINITE) == K4A_WAIT_RESULT_FAILED)
-			VERIFY(k4a_device_get_capture(dev, &element.sensor_capture, 10), "Capture failed");
 		if (bDel_)
 		{
-			k4a_device_stop_cameras(dev);//停止流
-			k4abt_tracker_shutdown(tracker);//关闭捕捉
+			k4abt_tracker_shutdown(tracker);
 			k4abt_tracker_destroy(tracker);
-			k4a_device_close(dev);
+			k4a_playback_close(playback);
+			fclose(fp);
+			fclose(fj);
 			break;
 		}
 	}
+	finish:
+	k4abt_tracker_shutdown(tracker);
+	k4abt_tracker_destroy(tracker);
+	k4a_playback_close(playback);
+	fclose(fp);
+	fclose(fj);
 }
 
 int kinectSubject:: capThread()
+{
+	tids_ = new thread[uintNum_];
+	for (uint i = 0; i < uintNum_; ++i)
+	{
+		tids_[i] = thread(&kinectSubject::cap, this, ref(dev_[i]), i, ref(sensorCalibration_[i]));
+	}
+	cout << "capThread Finished" << endl;
+	return 0;
+}
+
+int kinectSubject:: playbackThread()
 {
 	tids_ = new thread[uintNum_];
 	for (uint i = 0; i < uintNum_; ++i)
