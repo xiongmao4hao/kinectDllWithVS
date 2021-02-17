@@ -22,7 +22,9 @@ extern "C"
     EXPORT_API kinectSubject* getKinectSubject();
     EXPORT_API uint32_t getuintNum(kinectSubject* kinect);
     EXPORT_API int start(kinectSubject* kinect);
+    EXPORT_API int playbackStart(kinectSubject* kinect);
     EXPORT_API int cap(kinectSubject* kinect);
+    EXPORT_API int playbackCap(kinectSubject* kinect);
     EXPORT_API int stop(kinectSubject* kinect);
     EXPORT_API uint getObserver(kinectSubject* kinect);
     EXPORT_API int removeObserver(int i);

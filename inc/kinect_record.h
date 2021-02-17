@@ -56,7 +56,6 @@
 #include "kinect_angle.h"
 #include "get_roecord_config.h"
 #include <thread>
-#include "getFiles.hpp"
 
 #include <array>
 #include <iostream>
@@ -294,8 +293,10 @@ public:
 		std::cout << "There are " << list_observer_.size() << " observers in the list.\n";
 	}
 	virtual int recordStart();
-	virtual int recordStop();
+	virtual int playbackStart();
+	virtual int Stop();
 	virtual int capThread();
+	virtual int playbackThread();
 
 private:
 	std::list<IObserver*> list_observer_;
@@ -307,15 +308,15 @@ private:
 	bool               bInitFlag_         = false;
 	bool               bDel_              = false;
 	Mat*               piture_            = nullptr;
-	FILE*              fp_                = nullptr;
-	FILE*              fj_                = nullptr;
+	FILE**             fp_                = new FILE*[0];
+	FILE**             fj_                = new FILE*[0];
 
 	int init();
 	int initPlayback();
 	int reKinct();
 	int del();
 	void cap(k4a_device_t& dev, const int i, const k4a_calibration_t& sensorCalibration);  //普通的函数，用来执行线程
-	void playback(k4a_playback_t& playback, const int i, const k4a_calibration_t& sensorCalibration，const FILE fp, const FILE fj);  //普通的函数，用来执行线程
+	void playback(k4a_playback_t& playback, const int i, const k4a_calibration_t& sensorCalibration, FILE* fp, FILE* fj);  //普通的函数，用来执行线程
 	int onePicture(k4abt_tracker_t& tracker, \
 	oneElement* const element, std::list<IObserver*>::iterator iterator, const k4a_calibration_t* sensorCalibration);
 };

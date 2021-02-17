@@ -31,12 +31,20 @@ int start(kinectSubject* kinect) {
 	return kinect->recordStart();
 }
 
+int playbackStart(kinectSubject* kinect) {
+	return kinect->playbackStart();
+}
+
 int cap(kinectSubject* kinect) {
 	return kinect->capThread();
 }
 
+int playbackCap(kinectSubject* kinect) {
+	return kinect->playbackThread();
+}
+
 int stop(kinectSubject* kinect) {
-	return kinect->recordStop();
+	return kinect->Stop();
 }
 
 uint getObserver(kinectSubject* kinect) {

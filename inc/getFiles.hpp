@@ -13,4 +13,4 @@
 #include <io.h>
 #endif
 
-vector<string> getFiles(string cate_dir);
+std::vector<std::string> getFiles(std::string cate_dir);
