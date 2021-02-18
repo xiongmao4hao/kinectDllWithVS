@@ -95,10 +95,11 @@ struct oneElement {
 	// };
 	//float joints_Angel[ANGLE_NUM];
 	cv:: Mat* colorFrame;
-	k4a_capture_t sensor_capture = NULL;  //捕获用变量
+	bool          playbackFlag   = false;
+	k4a_capture_t sensor_capture = NULL;   //捕获用变量
 	k4abt_frame_t body_frame     = NULL;
 	uint64_t      timeStamp      = NULL;
-	uint32_t           numBodies      = 0;
+	uint32_t      numBodies      = 0;
 	vector<int> IDArray;
 	vector<k4abt_skeleton_t> skeleton;
 	vector<vector<k4a_float2_t>> points;
@@ -110,10 +111,10 @@ public:
 	virtual ~socketOb() {};
 	virtual int getAPicture(const Mat& picture, const string& elementName)          = 0;
 	virtual int getString(const vector<string>& element, const string& elementName) = 0;
-	virtual int getFVector(const vector<float>&element, const string& elementName)  = 0;
-	virtual int getUint32(const uint32_t , const string& elementName)               = 0;
-	virtual int sendJson()                                                          = 0;
-	virtual int findObserve(const bool& tmpFlag)                                    = 0;  //tmpFlag防止程序一直寻找
+	virtual int getFVector(const vector<float>&element, const string& elementName) = 0;
+	virtual int getUint32(const uint32_t , const string& elementName)              = 0;
+	virtual int sendJson(bool playbackFlag, int mod)                               = 0;
+	virtual int findObserve(const bool& tmpFlag)                                   = 0;  //tmpFlag防止程序一直寻找
 };
 
 //相机观测者接口
@@ -223,7 +224,7 @@ public:
 		return 0;
 	}
 
-	int sendJson() override;
+	int sendJson(bool playbackFlag, int mod) override;
 
 	int findObserve(const bool& tmpFlag) override{
 		while(open(readFifo_.c_str(), O_RDONLY) <0){
@@ -349,9 +350,14 @@ public:
 	}
 	virtual void OnlyShowMat(cv::Mat& colorFrame){
 		element_->colorFrame = &colorFrame;
+		element_->numBodies = 0;
+		//清空vector
+		element_->IDArray.clear();
+		element_->skeleton.clear();
+		element_->points.clear();
 		//matFlag = true;
 		cout << "only get mat" << endl;
-		PrintInfo();
+		PrintMat();
 	}
 	virtual void Attach(socketOb* pipeTarget) override {
 		cout << "attach pipe" << endl;
@@ -406,12 +412,35 @@ private:
 			(*iterator)->getString(jointsName,"jointsName");
 			(*iterator)->getString(IDName,"IDName");
 			(*iterator)->getAPicture(*element_->colorFrame,"pictureInfo");
-			(*iterator)->sendJson();
+			(*iterator)->sendJson(element_->playbackFlag,0);
 			++iterator;
 		}
 
 	}
 
+	void PrintMat() {
+		//发送json，之前请准备好数据
+		std::list<socketOb*>::iterator iterator = list_pipe_.begin();
+		//HowManyObserver();
+		while (iterator != list_pipe_.end()) {
+			//清空
+			fJoint_.clear();
+			vector<string> jointsName;
+			vector<string> pointsName;
+			vector<string> IDName;
+			//获取string
+			(*iterator)->getString(pointsName,"pointsName");
+			(*iterator)->getString(jointsName,"jointsName");
+			(*iterator)->getString(IDName,"IDName");
+			//获取图片
+			(*iterator)->getAPicture(*element_->colorFrame,"pictureInfo");
+			(*iterator)->sendJson(false,1);
+			++iterator;
+		}
+
+	}
+
+	
 	void HowManyObserver() {
 		std::cout << "There are " << list_pipe_.size() << " pipe in the list.\n";
 	}

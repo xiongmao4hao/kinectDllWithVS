@@ -35,22 +35,51 @@ int PipeElements::getAPicture(const Mat& picture, const string& elementName){
 		memcpy(picture_,picture.data,numpySize_);
 		return 0;
 	}
-int PipeElements::sendJson(){
+int PipeElements::sendJson(bool playbackFlag, int mod = 0){
 		ssize_t ret;
+		//初始化关机标志
+		j_["stopFlag"] = false;
 		char recvbuff[512];
 		if( (ret = read(readFd_, recvbuff, 512)) < 0)
 			ERR_EXIT("read err.");
+		//针对playback模式等待python端
+		while(0 == ret && true == playbackFlag && mod != 1)
+		{
+			if( (ret = read(readFd_, recvbuff, 512)) < 0)
+			ERR_EXIT("read err.");
+		}
 		// cout << "we have" << ret << endl;
 		//如果有接收端就发送
-		if(ret != 0 && ret != -1)
+		switch (mod)
 		{
-			//printf("%s\n", recvbuff);
-			const string s        = base64_encode(j_.dump().c_str(), j_.dump().size());
-			const char * sendData = s.c_str();
-			// cout << "the lengh of sendDate is" << strlen(sendData)+1 << endl;
-			// cout << j_.dump() << endl;
-			write(writeFd_, sendData, strlen(sendData)+1);
+		case 1:
+		{
+			if(ret != 0 && ret != -1)
+			{
+				//在json中添加关机标志
+				j_["stopFlag"]		  = true;
+				const string s        = base64_encode(j_.dump().c_str(), j_.dump().size());
+				const char * sendData = s.c_str();
+				write(writeFd_, sendData, strlen(sendData)+1);
+			}			
+			break;
 		}
+		default:
+		{
+			if(ret != 0 && ret != -1)
+			{
+				//printf("%s\n", recvbuff);
+				const string s        = base64_encode(j_.dump().c_str(), j_.dump().size());
+				const char * sendData = s.c_str();
+				// cout << "the lengh of sendDate is" << strlen(sendData)+1 << endl;
+				// cout << j_.dump() << endl;
+				write(writeFd_, sendData, strlen(sendData)+1);
+			}
+			break;
+		}
+			
+		}
+		
 		return 0;
 	}
 string PipeElements::stringToBase64_(const string& element){
@@ -338,6 +367,7 @@ void kinectSubject:: playback(k4a_playback_t& playback, const int i, const k4a_c
 	k4a_image_t colorImage;
 	uint8_t* colorTextureBuffer;
 	oneElement element;
+	element.playbackFlag = true;
 
 	//注意要在外部调用库时依据kinect数目创建
 	std::list<IObserver*>::iterator iterator = list_observer_.begin();
@@ -364,6 +394,7 @@ void kinectSubject:: playback(k4a_playback_t& playback, const int i, const k4a_c
 		switch (captureResult)
 		{
 		case K4A_WAIT_RESULT_SUCCEEDED:
+		{
 			colorImage         = k4a_capture_get_color_image(element.sensor_capture);  //从捕获中获取图像
 			colorTextureBuffer = k4a_image_get_buffer(colorImage);
 			//depthFrame = cv::Mat(depthImage.get_height_pixels(), depthImage.get_width_pixels(), CV_8UC4, depthTextureBuffer.data());
@@ -402,32 +433,33 @@ void kinectSubject:: playback(k4a_playback_t& playback, const int i, const k4a_c
 			fprintf(fp,"\n");
 		  	fprintf(fj,"\n");
 			break;
+		}
 		case K4A_WAIT_RESULT_TIMEOUT:
+		{
 			cout << "Record finished! Please check the txt files under the path you set!\n" << endl;
 			goto finish;
+		}
 		default:
+		{
 			cout << "Get depth capture returned error:" << captureResult << endl;
 			goto finish;
 		}
+		}
 		if (bDel_)
 		{
-			// k4abt_tracker_shutdown(tracker);
-			// k4abt_tracker_destroy(tracker);
-			// k4a_playback_close(playback);
-			// fclose(fp);
-			// fclose(fj);
-			// break;
 			goto finish;
 		}
 	}
 	finish:
+	//通知接收端关闭
+	(*iterator)->OnlyShowMat(*element.colorFrame);
+	//关闭自己变量
 	k4abt_tracker_shutdown(tracker);
 	k4abt_tracker_destroy(tracker);
 	k4a_playback_close(playback);
 	fclose(fp);
 	fclose(fj);
 	--uintNum_;
-	//TODO:不同步
 }
 
 int kinectSubject:: capThread()
@@ -472,15 +504,14 @@ int kinectSubject::onePicture(k4abt_tracker_t& tracker, \
 	{
 		// It should never hit timeout when K4A_WAIT_INFINITE is set.
 		cout << "Error! Add capture to tracker process queue timeout!\n" << endl;
-		element->numBodies = 0;
 		(*iterator)->OnlyShowMat(*element->colorFrame);
 		break;
 	}
 	case  K4A_WAIT_RESULT_FAILED:
 	{
 		cout << "Error! Add capture to tracker process queue failed!\n" << endl;
-		element->numBodies = 0;
 		(*iterator)->OnlyShowMat(*element->colorFrame);
+		break;
 	}
 	default:
 	{
