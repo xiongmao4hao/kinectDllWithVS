@@ -412,6 +412,7 @@ private:
 			(*iterator)->getString(jointsName,"jointsName");
 			(*iterator)->getString(IDName,"IDName");
 			(*iterator)->getAPicture(*element_->colorFrame,"pictureInfo");
+			(*iterator)->getUint32(element_->timeStamp,"timeStamp");
 			(*iterator)->sendJson(element_->playbackFlag,0);
 			++iterator;
 		}
@@ -434,6 +435,7 @@ private:
 			(*iterator)->getString(IDName,"IDName");
 			//»ñÈ¡Í¼Æ¬
 			(*iterator)->getAPicture(*element_->colorFrame,"pictureInfo");
+			(*iterator)->getUint32(element_->timeStamp,"timeStamp");
 			(*iterator)->sendJson(false,1);
 			++iterator;
 		}

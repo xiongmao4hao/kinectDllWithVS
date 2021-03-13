@@ -46,7 +46,7 @@ int PipeElements::sendJson(bool playbackFlag, int mod = 0){
 		while(0 == ret && true == playbackFlag && mod != 1)
 		{
 			if( (ret = read(readFd_, recvbuff, 512)) < 0)
-			ERR_EXIT("read err.");
+				ERR_EXIT("read err.");
 		}
 		// cout << "we have" << ret << endl;
 		//如果有接收端就发送
