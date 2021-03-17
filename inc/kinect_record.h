@@ -319,7 +319,7 @@ private:
 	void cap(k4a_device_t& dev, const int i, const k4a_calibration_t& sensorCalibration);  //普通的函数，用来执行线程
 	void playback(k4a_playback_t& playback, const int i, const k4a_calibration_t& sensorCalibration, FILE* fp, FILE* fj);  //普通的函数，用来执行线程
 	int onePicture(k4abt_tracker_t& tracker, \
-	oneElement* const element, std::list<IObserver*>::iterator iterator, const k4a_calibration_t* sensorCalibration);
+	oneElement* const element, std::list<IObserver*>::iterator iterator, const k4a_calibration_t* sensorCalibration, int i);
 };
 
 class  Observer : public IObserver {

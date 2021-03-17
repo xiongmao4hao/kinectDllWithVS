@@ -7,6 +7,36 @@ using namespace cv;
 using namespace std;
 using json = nlohmann::json;
 
+// float rotation_matrix_1t0_inv[3][3] = { 0.989966948, 0.06207, 0.126933,
+// -0.0663689811,	0.997347730, 0.0298774583,
+// -0.124742133, -0.0380021396, 0.991461163
+// };//0号从机到1号主机的旋转矩阵
+// float translation_matrix_1t0[3] = {
+// 721,
+// -49.744148,
+// 330.623132
+// };//0号从机到1号主机的平移矩阵
+
+// float rotation_matrix_0t1_inv[3][3] = { 0.48893, -0.0325101, 0.871717,
+// 0.0417562,	0.999032, 0.013838,
+// -0.871323, 0.0296338, 0.489814
+// };//0号从机到1号主机的旋转矩阵
+// float translation_matrix_0t1[3] = {
+// -176.688,
+// -3.06835,
+// 81.8213
+// };//0号从机到1号主机的平移矩阵
+
+float rotation_matrix_0t1_inv[3][3] = { 0.58994, -0.10218, 0.80095,
+0.10510, 0.99323, 0.04929,
+-0.80057, 0.05510, 0.59669
+};//0号从机到1号主机的旋转矩阵
+float translation_matrix_0t1[3] = {
+721.37706,
+99.48867,
+-156.37015
+};//0号从机到1号主机的平移矩阵
+
 int PipeElements::getAPicture(const Mat& picture, const string& elementName){
 		vector<int> pictureInfo ;
 		pictureInfo.push_back(picture.rows);
@@ -342,7 +372,7 @@ void kinectSubject:: cap(k4a_device_t& dev, const int i, const k4a_calibration_t
 			{
 				cout << "colorframe imdecode erro" << endl;
 			}
-			onePicture(tracker, &element, iterator, &sensorCalibration);
+			onePicture(tracker, &element, iterator, &sensorCalibration, i);
 			// imshow("Kinect color frame" + std::to_string(i), *element.colorFrame);
 			// waitKey(1);//窗口的要等待时间，当显示图片时，窗口不用实时更新，所以imshow之前不加waitKey也是可以的，但若显示实时的视频，就必须加waitKey
 			k4a_capture_release(element.sensor_capture);
@@ -412,7 +442,7 @@ void kinectSubject:: playback(k4a_playback_t& playback, const int i, const k4a_c
 			{
 				cout << "colorframe imdecode erro" << endl;
 			}
-			onePicture(tracker, &element, iterator, &sensorCalibration);
+			onePicture(tracker, &element, iterator, &sensorCalibration, i);
 			// imshow("Kinect color frame" + std::to_string(i), *element.colorFrame);
 			// waitKey(1);//窗口的要等待时间，当显示图片时，窗口不用实时更新，所以imshow之前不加waitKey也是可以的，但若显示实时的视频，就必须加waitKey
 			k4a_capture_release(element.sensor_capture);
@@ -485,7 +515,7 @@ int kinectSubject:: playbackThread()
 }
 
 int kinectSubject::onePicture(k4abt_tracker_t& tracker, \
-	oneElement* const element, std::list<IObserver*>::iterator iterator,const k4a_calibration_t* sensorCalibration)
+	oneElement* const element, std::list<IObserver*>::iterator iterator,const k4a_calibration_t* sensorCalibration, int i)
 {
 	k4abt_skeleton_t skeleton;
 	uint numBodies;
@@ -539,6 +569,42 @@ int kinectSubject::onePicture(k4abt_tracker_t& tracker, \
 						k4a_float3_t tmpK4aFloat3;
 						k4a_float2_t tmpK4aFloat2;
 						int tmpI;
+						if(i != iMasterNum_)
+						{
+							float x = skeleton.joints[a].position.xyz.x * rotation_matrix_0t1_inv[0][0]
+									+ skeleton.joints[a].position.xyz.y * rotation_matrix_0t1_inv[0][1]
+									+ skeleton.joints[a].position.xyz.z * rotation_matrix_0t1_inv[0][2]
+									+ translation_matrix_0t1[0];
+							float y = skeleton.joints[a].position.xyz.x * rotation_matrix_0t1_inv[1][0]
+									+ skeleton.joints[a].position.xyz.y * rotation_matrix_0t1_inv[1][1]
+									+ skeleton.joints[a].position.xyz.z * rotation_matrix_0t1_inv[1][2]
+									+ translation_matrix_0t1[1];
+							float z = skeleton.joints[a].position.xyz.x * rotation_matrix_0t1_inv[2][0]
+									+ skeleton.joints[a].position.xyz.y * rotation_matrix_0t1_inv[2][1]
+									+ skeleton.joints[a].position.xyz.z * rotation_matrix_0t1_inv[2][2]
+									+ translation_matrix_0t1[2];
+							skeleton.joints[a].position.xyz.x = x;
+							skeleton.joints[a].position.xyz.y = y;
+							skeleton.joints[a].position.xyz.z = z;
+						}
+						// else
+						// {
+						// 	float x = skeleton.joints[a].position.xyz.x * rotation_matrix_1t0_inv[0][0]
+						// 			+ skeleton.joints[a].position.xyz.y * rotation_matrix_1t0_inv[0][1]
+						// 			+ skeleton.joints[a].position.xyz.z * rotation_matrix_1t0_inv[0][2]
+						// 			+ translation_matrix_1t0[0];
+						// 	float y = skeleton.joints[a].position.xyz.x * rotation_matrix_1t0_inv[1][0]
+						// 			+ skeleton.joints[a].position.xyz.y * rotation_matrix_1t0_inv[1][1]
+						// 			+ skeleton.joints[a].position.xyz.z * rotation_matrix_1t0_inv[1][2]
+						// 			+ translation_matrix_1t0[1];
+						// 	float z = skeleton.joints[a].position.xyz.x * rotation_matrix_1t0_inv[2][0]
+						// 			+ skeleton.joints[a].position.xyz.y * rotation_matrix_1t0_inv[2][1]
+						// 			+ skeleton.joints[a].position.xyz.z * rotation_matrix_1t0_inv[2][2]
+						// 			+ translation_matrix_1t0[2];
+						// 	skeleton.joints[a].position.xyz.x = x;
+						// 	skeleton.joints[a].position.xyz.y = y;
+						// 	skeleton.joints[a].position.xyz.z = z;
+						// }
 						// cout << skeleton.joints[a].position.xyz.x << endl;
 						// cout << k4a_calibration_3d_to_3d(&(sensorCalibration_[i]), &(skeleton.joints[a].position),\
 						//  K4A_CALIBRATION_TYPE_DEPTH, K4A_CALIBRATION_TYPE_COLOR, tmpK4aFloat3) << endl;
@@ -546,7 +612,6 @@ int kinectSubject::onePicture(k4abt_tracker_t& tracker, \
 						  K4A_CALIBRATION_TYPE_DEPTH, K4A_CALIBRATION_TYPE_COLOR, &tmpK4aFloat3),"calibration_3d_to_3d failed");
 						VERIFY(k4a_calibration_3d_to_2d(sensorCalibration, &skeleton.joints[a].position,\
 						 K4A_CALIBRATION_TYPE_DEPTH, K4A_CALIBRATION_TYPE_COLOR, &tmpK4aFloat2, &tmpI),"calibration_3d_to_2d failed");
-						// cout << *tmpI << endl;
 						tmpPoints.push_back(tmpK4aFloat2);
 						skeleton.joints[a].position = tmpK4aFloat3;						
 					}
